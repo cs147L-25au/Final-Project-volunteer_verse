@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 
-import Login from "../../components/Login";
+import Login from "@/components/Login";
 // import Loading from "../components/Loading";
 
 // import { db } from "../database";
