@@ -68,7 +68,7 @@ export default function Login() {
       />
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          onPress={() => signInWithEmail()}
+          onPress={() => router.navigate("/homepage")} //signInWithEmail()}
           disabled={isSignInDisabled}
         >
           <Text

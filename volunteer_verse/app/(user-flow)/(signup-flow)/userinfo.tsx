@@ -14,6 +14,8 @@ import {
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
+import type { MediaType } from "expo-image-picker";
+const IMAGE_ONLY: MediaType[] = ["images"];
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -57,14 +59,13 @@ export default function UserInfo() {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) return;
           const res = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true, // opens crop UI after capture
-            aspect: [1, 1], // square crop
+            mediaTypes: IMAGE_ONLY,
+            allowsEditing: true,
+            aspect: [1, 1],
             quality: 0.9,
           });
-          if (!res.canceled && res.assets?.[0]?.uri) {
+          if (!res.canceled && res.assets?.[0]?.uri)
             setPhotoUri(res.assets[0].uri);
-          }
         },
       },
       {
@@ -73,14 +74,13 @@ export default function UserInfo() {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) return;
           const res = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true, // opens crop UI for library
+            mediaTypes: IMAGE_ONLY,
+            allowsEditing: true,
             aspect: [1, 1],
             quality: 0.9,
           });
-          if (!res.canceled && res.assets?.[0]?.uri) {
+          if (!res.canceled && res.assets?.[0]?.uri)
             setPhotoUri(res.assets[0].uri);
-          }
         },
       },
       { text: "Cancel", style: "cancel" },
