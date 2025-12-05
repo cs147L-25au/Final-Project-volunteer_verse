@@ -56,8 +56,24 @@ export default function NewVolunteer() {
     router.push("/userinfo");
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/signup");
+    }
+  };
+
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={goBack}
+        style={styles.backButton}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
       <View style={styles.content}>
         <Text style={styles.title}>
           What areas are you most interested in impacting?
@@ -132,6 +148,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     paddingHorizontal: 20,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  backText: {
+    color: ACCENT,
+    fontSize: 15,
+    fontWeight: "700",
   },
   content: {
     flex: 1,

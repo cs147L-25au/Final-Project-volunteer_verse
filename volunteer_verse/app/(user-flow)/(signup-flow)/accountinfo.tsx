@@ -31,12 +31,28 @@ export default function AccountInfo() {
     router.replace("/(user-flow)"); // login screen
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/userinfo");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={goBack}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>Let's create your account</Text>
         <View style={styles.fieldGroup}>
           <TextInput
@@ -149,6 +165,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  backText: {
+    color: ACCENT,
+    fontSize: 15,
+    fontWeight: "700",
   },
   title: {
     fontSize: 24,

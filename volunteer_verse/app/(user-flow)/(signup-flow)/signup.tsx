@@ -13,8 +13,24 @@ export default function Signup() {
     router.push(role === "volunteer" ? "/newvolunteer" : "/neworganization");
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  };
+
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={goBack}
+        style={styles.backButton}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
       <View style={styles.content}>
         <Text style={styles.title}>I am a...</Text>
         <View style={styles.card}>
@@ -86,6 +102,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingTop: 24,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  backText: {
+    color: ACCENT,
+    fontSize: 15,
+    fontWeight: "700",
   },
   title: {
     fontSize: 28,

@@ -92,12 +92,28 @@ export default function UserInfo() {
     router.push("/accountinfo");
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/newvolunteer");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={goBack}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>Tell us a bit about yourself</Text>
         <View style={styles.fieldGroup}>
           <TextInput
@@ -232,6 +248,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  backText: {
+    color: ACCENT,
+    fontSize: 15,
+    fontWeight: "700",
   },
   title: {
     fontSize: 24,
