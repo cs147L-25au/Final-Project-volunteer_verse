@@ -1,6 +1,3 @@
-// FIRST PAGE OF THE APP.
-// The user can login as a volunteer or organization,
-// or choose to make a new account.
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -10,10 +7,22 @@ import {
   View,
   TextInput,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import Theme from "../assets/theme";
 import { supabase } from "../utils/supabase";
+
+// New Color Palette
+const COLORS = {
+  cream: "#F2F0E9",
+  lightBlue: "#97B1D6",
+  mediumBlue: "#567FB1",
+  darkBlue: "#324A76",
+  black: "#000000",
+  white: "#FFFFFF",
+};
 
 type Role = "volunteer" | "organization";
 
@@ -103,26 +112,35 @@ export default function Login() {
     loading || !role || email.length === 0 || password.length === 0;
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <View style={styles.content}>
-        <View style={styles.splash}>
-          <Text style={styles.splashText}>Volunteer Verse</Text>
-          <Text style={styles.subhead}>Log in to start helping out</Text>
-        </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <StatusBar style="dark" />
 
+      {/* Top Section: Title */}
+      <View style={styles.topSection}>
+        <Text style={styles.splashText}>VolunteerVerse</Text>
+        <Text style={styles.subhead}>Log in to start helping out</Text>
+      </View>
+
+      {/* Middle Section: Form (Centered) */}
+      <ScrollView
+        contentContainerStyle={styles.middleSection}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Log in as</Text>
           <View style={styles.rolesRow}>
             <RoleCard
               label="Volunteer"
-              description="Find opportunities and track your impact."
+              description="Find opportunities."
               selected={role === "volunteer"}
               onPress={() => setRole("volunteer")}
             />
             <RoleCard
               label="Organization"
-              description="Share opportunities and manage volunteers."
+              description="Manage events."
               selected={role === "organization"}
               onPress={() => setRole("organization")}
             />
@@ -135,7 +153,7 @@ export default function Login() {
             onChangeText={(text) => setEmail(text)}
             value={email}
             placeholder="email@address.com"
-            placeholderTextColor={Theme.colors.textSecondary}
+            placeholderTextColor={COLORS.mediumBlue}
             autoCapitalize={"none"}
             style={styles.input}
           />
@@ -146,7 +164,7 @@ export default function Login() {
             onChangeText={(text) => setPassword(text)}
             value={password}
             placeholder="Password"
-            placeholderTextColor={Theme.colors.textSecondary}
+            placeholderTextColor={COLORS.mediumBlue}
             secureTextEntry={true}
             autoCapitalize={"none"}
             style={styles.input}
@@ -157,13 +175,12 @@ export default function Login() {
           <TouchableOpacity
             onPress={signInWithEmail}
             disabled={isSignInDisabled}
+            style={[
+              styles.signInButton,
+              isSignInDisabled && styles.signInButtonDisabled,
+            ]}
           >
-            <Text
-              style={[
-                styles.button,
-                isSignInDisabled ? styles.buttonDisabled : undefined,
-              ]}
-            >
+            <Text style={styles.buttonText}>
               {loading
                 ? "Signing you in..."
                 : role
@@ -174,14 +191,15 @@ export default function Login() {
             </Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
 
-        <View style={styles.secondaryAction}>
-          <TouchableOpacity onPress={() => router.navigate("/usertype")}>
-            <Text style={styles.secondaryText}>New user? Sign up here</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Bottom Section: Sign Up Link */}
+      <View style={styles.bottomSection}>
+        <TouchableOpacity onPress={() => router.navigate("/usertype")}>
+          <Text style={styles.secondaryText}>New user? Sign up here</Text>
+        </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -219,43 +237,52 @@ function RoleCard({
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 32,
+    flex: 1,
+    backgroundColor: COLORS.cream,
+  },
+  topSection: {
+    paddingTop: 80,
+    paddingBottom: 20,
     paddingHorizontal: 16,
-    backgroundColor: Theme.colors.backgroundPrimary,
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  splash: {
     alignItems: "center",
-    marginBottom: 4,
+    justifyContent: "flex-end",
+  },
+  middleSection: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  bottomSection: {
+    paddingBottom: 50,
+    alignItems: "center",
+    justifyContent: "center",
   },
   splashText: {
-    fontWeight: "bold",
-    color: Theme.colors.textPrimary,
-    fontSize: 60,
+    fontWeight: "800",
+    color: COLORS.darkBlue,
+    fontSize: 42,
+    textAlign: "center",
   },
   subhead: {
     marginTop: 8,
-    color: Theme.colors.textSecondary,
+    color: COLORS.mediumBlue,
     fontSize: 16,
+    fontWeight: "600",
   },
   card: {
-    backgroundColor: Theme.colors.backgroundSecondary,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Theme.colors.tabBarBorder,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
+    backgroundColor: COLORS.lightBlue,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: COLORS.black,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   sectionLabel: {
-    color: Theme.colors.textPrimary,
+    color: COLORS.darkBlue,
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 10,
@@ -263,78 +290,78 @@ const styles = StyleSheet.create({
   rolesRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
   },
   roleCard: {
-    width: "48%",
-    backgroundColor: Theme.colors.backgroundPrimary,
+    flex: 1,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Theme.colors.tabBarBorder,
+    borderWidth: 2,
+    borderColor: "transparent",
     padding: 12,
+    alignItems: "center",
   },
   roleCardSelected: {
-    borderColor: Theme.colors.textHighlighted,
-    backgroundColor: "#2e2e2e",
+    borderColor: COLORS.darkBlue,
+    backgroundColor: "#E3EBF5",
   },
   roleLabel: {
-    color: Theme.colors.textPrimary,
-    fontSize: 16,
+    color: COLORS.mediumBlue,
+    fontSize: 15,
     fontWeight: "700",
     marginBottom: 4,
   },
   roleLabelSelected: {
-    color: Theme.colors.textHighlighted,
+    color: COLORS.darkBlue,
   },
   roleDescription: {
-    color: Theme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  roleDescriptionSelected: {
-    color: Theme.colors.textPrimary,
-  },
-  labelSpacing: {
-    marginTop: 12,
-  },
-  buttonContainer: {
-    marginTop: 20,
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  verticallySpaced: {
-    marginVertical: 4,
-    alignSelf: "stretch",
-  },
-  mt20: {
-    marginTop: 20,
-  },
-  input: {
-    color: Theme.colors.textPrimary,
-    backgroundColor: Theme.colors.backgroundSecondary,
-    width: "100%",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderColor: Theme.colors.tabBarBorder,
-    borderWidth: 1,
-  },
-  button: {
-    color: Theme.colors.textHighlighted,
-    fontSize: 18,
-    fontWeight: "normal",
-    padding: 8,
+    color: "#6B7280",
+    fontSize: 12,
     textAlign: "center",
   },
-  buttonDisabled: {
-    color: Theme.colors.textSecondary,
+  roleDescriptionSelected: {
+    color: COLORS.darkBlue,
   },
-  secondaryAction: {
+  labelSpacing: {
+    marginTop: 16,
+  },
+  input: {
+    color: COLORS.darkBlue,
+    backgroundColor: COLORS.white,
+    width: "100%",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  buttonContainer: {
+    marginTop: 10,
+  },
+  signInButton: {
+    backgroundColor: COLORS.mediumBlue,
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: "center",
-    marginTop: 12,
+    shadowColor: COLORS.mediumBlue,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  signInButtonDisabled: {
+    backgroundColor: "#CBD5E1",
+    shadowOpacity: 0,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: "bold",
   },
   secondaryText: {
-    color: Theme.colors.textPrimary,
+    color: COLORS.darkBlue,
     fontSize: 16,
     fontWeight: "600",
+    textDecorationLine: "underline",
   },
 });
