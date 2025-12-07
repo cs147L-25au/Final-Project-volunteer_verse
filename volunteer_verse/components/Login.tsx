@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../utils/supabase";
@@ -129,6 +130,14 @@ export default function Login() {
         contentContainerStyle={styles.middleSection}
         showsVerticalScrollIndicator={false}
       >
+        {/* Logo inserted here */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("../assets/VV_Logo.jpg")}
+            style={styles.logo}
+          />
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Log in as</Text>
           <View style={styles.rolesRow}>
@@ -241,8 +250,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cream,
   },
   topSection: {
-    paddingTop: 80,
-    paddingBottom: 20,
+    paddingTop: 60, // Reduced slightly to accommodate logo
+    paddingBottom: 10,
     paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "flex-end",
@@ -269,6 +278,17 @@ const styles = StyleSheet.create({
     color: COLORS.mediumBlue,
     fontSize: 16,
     fontWeight: "600",
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+    marginTop: 10,
+  },
+  logo: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    resizeMode: "contain",
   },
   card: {
     backgroundColor: COLORS.lightBlue,
