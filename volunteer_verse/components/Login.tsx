@@ -26,7 +26,10 @@ export default function Login() {
 
   const signInWithEmail = async () => {
     if (!role) {
-      Alert.alert("Choose a role", "Select volunteer or organization to continue.");
+      Alert.alert(
+        "Choose a role",
+        "Select volunteer or organization to continue."
+      );
       return;
     }
     if (!email || !password) {
@@ -35,13 +38,11 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      const {
-        data: authData,
-        error: authError,
-      } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (authError || !authData.user) {
         throw authError || new Error("No user returned from Supabase.");
@@ -73,10 +74,12 @@ export default function Login() {
           throw new Error(updateError.message);
         }
       } else {
-        const { error: insertError } = await supabase.from("user_info_").insert({
-          user_auth_id: userId,
-          org_bool: orgBool,
-        });
+        const { error: insertError } = await supabase
+          .from("user_info_")
+          .insert({
+            user_auth_id: userId,
+            org_bool: orgBool,
+          });
 
         if (insertError) {
           throw new Error(insertError.message);
@@ -164,14 +167,16 @@ export default function Login() {
               {loading
                 ? "Signing you in..."
                 : role
-                ? `Sign in as ${role === "volunteer" ? "Volunteer" : "Organization"}`
+                ? `Sign in as ${
+                    role === "volunteer" ? "Volunteer" : "Organization"
+                  }`
                 : "Choose a role to continue"}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.secondaryAction}>
-          <TouchableOpacity onPress={() => router.navigate("/signup")}>
+          <TouchableOpacity onPress={() => router.navigate("/usertype")}>
             <Text style={styles.secondaryText}>New user? Sign up here</Text>
           </TouchableOpacity>
         </View>

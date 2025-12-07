@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 
 type Role = "volunteer" | "organization" | null;
 
-export default function Signup() {
+export default function Usertype() {
   const [role, setRole] = useState<Role>(null);
   const router = useRouter();
 
