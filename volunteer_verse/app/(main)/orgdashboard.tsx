@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type EventItem = {
   id: string;
@@ -54,11 +55,12 @@ const EVENTS: EventItem[] = [
 
 export default function OrgDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const renderItem = ({ item }: { item: EventItem }) => (
     <EventCard
       event={item}
-      onEdit={() => router.push(`/editevent/${item.id}`)} // adjust route if needed
+      onEdit={() => router.push(`/editevent/${item.id}`)}
       onDelete={() => confirmDelete(item)}
     />
   );
@@ -73,7 +75,7 @@ export default function OrgDashboard() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            // TODO: remove from backend; then update local state
+            // TODO: remove from backend
             Alert.alert("Deleted", `${event.name} has been deleted.`);
           },
         },
@@ -83,9 +85,18 @@ export default function OrgDashboard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Header with Profile Button */}
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={styles.headerTitle}>Your Events</Text>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => router.push("/profilepage")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.iconText}>👤</Text>
+        </TouchableOpacity>
       </View>
+
       <FlatList
         data={EVENTS}
         keyExtractor={(e) => e.id}
@@ -190,14 +201,34 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 12,
     backgroundColor: BG,
+    flexDirection: "row", // Added to align title and icon
+    justifyContent: "space-between", // Push icon to the right
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
     color: TEXT_PRIMARY,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  iconText: {
+    fontSize: 18,
   },
   listContent: {
     paddingHorizontal: 20,
