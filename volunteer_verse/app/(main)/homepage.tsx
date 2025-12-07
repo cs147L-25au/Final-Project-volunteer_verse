@@ -1,5 +1,4 @@
-// main page for users to view a list of organizations
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -33,6 +33,7 @@ const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
+const HEART = "#EF4444";
 
 const AREA_COLORS: Record<AreaKey, string> = {
   environment: "#22C55E",
@@ -48,7 +49,7 @@ function chipBg(hex: string, alpha = 0.16) {
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
-  return "rgba(${r}, ${g}, ${b}, ${alpha})";
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // Example data; replace with fetch from your backend
@@ -97,45 +98,71 @@ const ORGANIZATIONS: Org[] = [
 
 export default function HomePage() {
   const router = useRouter();
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [showLikedOnly, setShowLikedOnly] = useState(false);
 
-  const renderItem = ({ item }: { item: Org }) => (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => router.push(`/org/${item.id}`)}
-      style={styles.row}
-    >
-      <Image source={{ uri: item.image }} style={styles.logo} />
-      <View style={styles.info}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.mission} numberOfLines={2}>
-          {item.mission}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>
-            {item.sizeLabel} • {item.location}
-          </Text>
-        </View>
-
-        <View style={styles.chips}>
-          {item.areas.map((a) => (
-            <View
-              key={a}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: chipBg(AREA_COLORS[a]),
-                  borderColor: AREA_COLORS[a],
-                },
-              ]}
-            >
-              <View style={[styles.dot, { backgroundColor: AREA_COLORS[a] }]} />
-              <Text style={styles.chipLabel}>{labelForArea(a)}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </TouchableOpacity>
+  const data = useMemo(
+    () =>
+      showLikedOnly
+        ? ORGANIZATIONS.filter((o) => liked.has(o.id))
+        : ORGANIZATIONS,
+    [showLikedOnly, liked]
   );
+
+  const toggleLike = (id: string) => {
+    setLiked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const renderItem = ({ item }: { item: Org }) => {
+    const isLiked = liked.has(item.id);
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => router.push(`/${item.id}`)}
+        style={styles.row}
+      >
+        <Image source={{ uri: item.image }} style={styles.logo} />
+        <View style={styles.info}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.mission} numberOfLines={2}>
+            {item.mission}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta}>
+              {item.sizeLabel} • {item.location}
+            </Text>
+          </View>
+          <View style={styles.chips}>
+            {item.areas.map((a) => (
+              <View
+                key={a}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: chipBg(AREA_COLORS[a]),
+                    borderColor: AREA_COLORS[a],
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.dot, { backgroundColor: AREA_COLORS[a] }]}
+                />
+                <Text style={styles.chipLabel}>{labelForArea(a)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Card heart button */}
+        <CardHeart liked={isLiked} onToggle={() => toggleLike(item.id)} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -150,21 +177,77 @@ export default function HomePage() {
             <Text style={styles.iconText}>⚙️</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/favorites")}
+            style={[styles.iconBtn, showLikedOnly && { borderColor: HEART }]}
+            onPress={() => setShowLikedOnly((v) => !v)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.iconText}>♡</Text>
+            <Text style={[styles.iconText, showLikedOnly && { color: HEART }]}>
+              {showLikedOnly ? "♥" : "♡"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
       <FlatList
-        data={ORGANIZATIONS}
+        data={data}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </View>
+  );
+}
+
+function CardHeart({
+  liked,
+  onToggle,
+}: {
+  liked: boolean;
+  onToggle: () => void;
+}) {
+  const scale = React.useRef(new Animated.Value(1)).current;
+
+  const press = () => {
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 1.15,
+        useNativeDriver: true,
+        friction: 3,
+        tension: 200,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 4,
+        tension: 220,
+      }),
+    ]).start();
+    onToggle();
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.cardHeartWrap}
+      onPress={press}
+      activeOpacity={0.85}
+    >
+      <Animated.View
+        style={[
+          styles.cardHeart,
+          { transform: [{ scale }] },
+          liked && { borderColor: HEART, shadowOpacity: 0.12 },
+        ]}
+      >
+        <Text
+          style={[
+            styles.iconText,
+            liked ? { color: HEART } : { color: "#9CA3AF" },
+          ]}
+        >
+          {liked ? "♥" : "♡"}
+        </Text>
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
@@ -192,12 +275,12 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
+    marginTop: "10%",
     paddingTop: 20,
     paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // subtle shadow
     backgroundColor: BG,
   },
   headerTitle: {
@@ -229,9 +312,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 120, // space for bottom tabs
+    paddingBottom: 120,
   },
   row: {
+    position: "relative",
     flexDirection: "row",
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -254,6 +338,7 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+    paddingRight: 48, // leave space so heart doesn’t overlap text
   },
   name: {
     fontSize: 18,
@@ -300,5 +385,25 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 12,
+  },
+  cardHeartWrap: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+  },
+  cardHeart: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
 });

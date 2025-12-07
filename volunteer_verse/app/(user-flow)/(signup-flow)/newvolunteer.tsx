@@ -61,7 +61,7 @@ export default function NewVolunteer() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/signup");
+      router.replace("/userinfo");
     }
   };
 
