@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -100,6 +101,15 @@ export default function HomePage() {
   const router = useRouter();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [showLikedOnly, setShowLikedOnly] = useState(false);
+  const [search, setSearch] = useState("");
+  const filteredData = useMemo(() => {
+    const base = showLikedOnly
+      ? ORGANIZATIONS.filter((o) => liked.has(o.id))
+      : ORGANIZATIONS;
+    const q = search.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((o) => matchesOrg(o, q));
+  }, [showLikedOnly, liked, search]);
 
   const data = useMemo(
     () =>
@@ -187,8 +197,20 @@ export default function HomePage() {
           </TouchableOpacity>
         </View>
       </View>
+      <View style={styles.searchContainer}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by name, mission, domain, or location"
+          placeholderTextColor="#9CA3AF"
+          style={styles.searchInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+      </View>
       <FlatList
-        data={data}
+        data={filteredData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
@@ -266,6 +288,16 @@ function labelForArea(a: AreaKey) {
     case "marginalized":
       return "Marginalized Groups";
   }
+}
+
+function matchesOrg(org: Org, q: string) {
+  const fields = [
+    org.name,
+    org.mission,
+    org.location,
+    ...org.areas.map(labelForArea),
+  ];
+  return fields.some((t) => t.toLowerCase().includes(q));
 }
 
 const styles = StyleSheet.create({
@@ -405,5 +437,24 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  searchInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: BORDER,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: TEXT_PRIMARY,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
 });
