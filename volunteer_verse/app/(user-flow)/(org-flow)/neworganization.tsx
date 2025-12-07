@@ -1,3 +1,5 @@
+// First page of organization signup flow.
+// User enters organization details and then continues to accountinfo
 import React, { useState } from "react";
 import {
   View,

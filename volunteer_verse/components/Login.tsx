@@ -1,3 +1,6 @@
+// FIRST PAGE OF THE APP.
+// The user can login as a volunteer or organization,
+// or choose to make a new account.
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -133,7 +136,9 @@ export default function Login() {
             autoCapitalize={"none"}
             style={styles.input}
           />
-          <Text style={[styles.sectionLabel, styles.labelSpacing]}>Password</Text>
+          <Text style={[styles.sectionLabel, styles.labelSpacing]}>
+            Password
+          </Text>
           <TextInput
             onChangeText={(text) => setPassword(text)}
             value={password}
@@ -146,7 +151,10 @@ export default function Login() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity onPress={signInWithEmail} disabled={isSignInDisabled}>
+          <TouchableOpacity
+            onPress={signInWithEmail}
+            disabled={isSignInDisabled}
+          >
             <Text
               style={[
                 styles.button,
@@ -192,7 +200,12 @@ function RoleCard({
       <Text style={[styles.roleLabel, selected && styles.roleLabelSelected]}>
         {label}
       </Text>
-      <Text style={[styles.roleDescription, selected && styles.roleDescriptionSelected]}>
+      <Text
+        style={[
+          styles.roleDescription,
+          selected && styles.roleDescriptionSelected,
+        ]}
+      >
         {description}
       </Text>
     </TouchableOpacity>

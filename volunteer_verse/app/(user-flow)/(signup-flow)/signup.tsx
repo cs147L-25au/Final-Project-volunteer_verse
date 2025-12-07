@@ -1,3 +1,5 @@
+// FIRST PAGE OF SIGN UP, user selects whether they
+// are a volunteer or organization
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
@@ -105,7 +107,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: "flex-start",
-    marginTop: 14,
+    marginTop: "10%",
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
