@@ -186,6 +186,15 @@ export default function HomePage() {
           >
             <Text style={styles.iconText}>⚙️</Text>
           </TouchableOpacity>
+
+          {/* NEW: Calendar Button */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/calendar")}
+          >
+            <Text style={styles.iconText}>📅</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.iconBtn, showLikedOnly && { borderColor: HEART }]}
             onPress={() => setShowLikedOnly((v) => !v)}
