@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import Theme from "../assets/theme";
+import { supabase } from "../utils/supabase";
 
 type Role = "volunteer" | "organization";
 
@@ -25,29 +26,71 @@ export default function Login() {
       Alert.alert("Choose a role", "Select volunteer or organization to continue.");
       return;
     }
+    if (!email || !password) {
+      Alert.alert("Missing info", "Enter your email and password to continue.");
+      return;
+    }
     setLoading(true);
-    console.log("Loaded");
-    // try {
-    //   const { data, error } = await db.auth.signInWithPassword({
-    //     email: email,
-    //     password: password,
-    //     // shouldCreateUser is only for OTP/magic link authentication.
-    //     // options: {
-    //     //   shouldCreateUser: false,
-    //     // },
-    //   });
+    try {
+      const {
+        data: authData,
+        error: authError,
+      } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    //   if (error) {
-    //     Alert.alert(error.message);
-    //   }
-    setLoading(false);
-    console.log("Past loading");
-    // } catch (err) {
-    //   console.error(err);
-    // }
+      if (authError || !authData.user) {
+        throw authError || new Error("No user returned from Supabase.");
+      }
 
-    const destination = role === "organization" ? "/orgdashboard" : "/homepage";
-    router.replace(destination);
+      const userId = authData.user.id;
+      const orgBool = role === "organization";
+
+      const { data: existingInfo, error: fetchInfoError } = await supabase
+        .from("user_info_")
+        .select("id")
+        .eq("user_auth_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (fetchInfoError) {
+        throw new Error(fetchInfoError.message);
+      }
+
+      const existingId = existingInfo?.[0]?.id as number | undefined;
+
+      if (existingId) {
+        const { error: updateError } = await supabase
+          .from("user_info_")
+          .update({ org_bool: orgBool })
+          .eq("id", existingId);
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+      } else {
+        const { error: insertError } = await supabase.from("user_info_").insert({
+          user_auth_id: userId,
+          org_bool: orgBool,
+        });
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+      }
+
+      const destination = orgBool ? "/orgdashboard" : "/homepage";
+      router.replace(destination);
+    } catch (err) {
+      console.error("Supabase sign-in failed:", err);
+      Alert.alert(
+        "Login failed",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isSignInDisabled =
@@ -110,7 +153,11 @@ export default function Login() {
                 isSignInDisabled ? styles.buttonDisabled : undefined,
               ]}
             >
-              {role ? `Sign in as ${role === "volunteer" ? "Volunteer" : "Organization"}` : "Choose a role to continue"}
+              {loading
+                ? "Signing you in..."
+                : role
+                ? `Sign in as ${role === "volunteer" ? "Volunteer" : "Organization"}`
+                : "Choose a role to continue"}
             </Text>
           </TouchableOpacity>
         </View>
