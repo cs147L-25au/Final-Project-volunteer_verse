@@ -11,9 +11,10 @@ import {
   Platform,
   Modal,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { supabase } from "../../utils/supabase";
 
 // Reusing app theme constants
 const ACCENT = "#5865F2";
@@ -21,8 +22,9 @@ const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
+const DANGER = "#EF4444";
 
-// Interests Data (from newvolunteer.tsx)
+// Interests Data
 type AreaKey =
   | "environment"
   | "education"
@@ -50,9 +52,8 @@ function hexToRgba(hex: string, alpha = 0.14) {
 
 export default function ProfilePage() {
   const router = useRouter();
-
-  // --- STATE: Role Toggle (For Demo Purposes) ---
-  const [isOrg, setIsOrg] = useState(false);
+  const params = useLocalSearchParams();
+  const isOrg = params.type === "org";
 
   // --- STATE: Volunteer ---
   const [vPhoto, setVPhoto] = useState<string | null>(
@@ -70,7 +71,6 @@ export default function ProfilePage() {
   const [oLogo, setOLogo] = useState<string | null>(
     "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=400&q=80"
   );
-  // Banner state removed as per previous request
   const [orgName, setOrgName] = useState("Green Horizons");
   const [location, setLocation] = useState("San Jose, CA");
   const [mission, setMission] = useState(
@@ -93,7 +93,7 @@ export default function ProfilePage() {
           const res = await ImagePicker.launchCameraAsync({
             mediaTypes: ["images"],
             allowsEditing: true,
-            aspect: [1, 1], // Square aspect for avatars
+            aspect: [1, 1],
             quality: 0.8,
           });
           if (!res.canceled && res.assets[0].uri) setter(res.assets[0].uri);
@@ -107,7 +107,7 @@ export default function ProfilePage() {
           const res = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ["images"],
             allowsEditing: true,
-            aspect: [4, 3], // Generic aspect
+            aspect: [4, 3],
             quality: 0.8,
           });
           if (!res.canceled && res.assets[0].uri) setter(res.assets[0].uri);
@@ -125,14 +125,22 @@ export default function ProfilePage() {
 
   const handleSave = () => {
     Alert.alert("Success", "Your profile has been updated.");
-    // In a real app, you would sync with Supabase here
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert("Error signing out", error.message);
+    } else {
+      router.replace("/");
+    }
   };
 
   const onDateChange = (_: any, selected?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
     if (selected) {
       setDob(selected);
-      setTempDate(selected); // sync temp
+      setTempDate(selected);
     }
   };
 
@@ -140,7 +148,6 @@ export default function ProfilePage() {
 
   const renderVolunteerProfile = () => (
     <View style={styles.formSection}>
-      {/* Avatar */}
       <View style={styles.avatarRow}>
         <TouchableOpacity
           onPress={() => pickImage(setVPhoto)}
@@ -162,7 +169,6 @@ export default function ProfilePage() {
         </TouchableOpacity>
       </View>
 
-      {/* Name Fields */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>First Name</Text>
         <TextInput
@@ -180,7 +186,6 @@ export default function ProfilePage() {
         />
       </View>
 
-      {/* Birthday */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Date of Birth</Text>
         <TouchableOpacity
@@ -200,7 +205,6 @@ export default function ProfilePage() {
         </TouchableOpacity>
       </View>
 
-      {/* Interests */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Interests</Text>
         <View style={styles.chipGrid}>
@@ -243,7 +247,6 @@ export default function ProfilePage() {
 
   const renderOrgProfile = () => (
     <View style={styles.formSection}>
-      {/* Logo */}
       <View style={styles.avatarRow}>
         <TouchableOpacity
           onPress={() => pickImage(setOLogo)}
@@ -262,7 +265,6 @@ export default function ProfilePage() {
         </TouchableOpacity>
       </View>
 
-      {/* Org Name (Removed Verification Checkmark) */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Organization Name</Text>
         <TextInput
@@ -272,7 +274,6 @@ export default function ProfilePage() {
         />
       </View>
 
-      {/* Location */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>City / Region</Text>
         <TextInput
@@ -283,7 +284,6 @@ export default function ProfilePage() {
         />
       </View>
 
-      {/* Mission */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Mission Statement</Text>
         <TextInput
@@ -294,7 +294,6 @@ export default function ProfilePage() {
         />
       </View>
 
-      {/* Org Interests (Added) */}
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Interests / Focus Areas</Text>
         <View style={styles.chipGrid}>
@@ -337,18 +336,12 @@ export default function ProfilePage() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
           <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setIsOrg(!isOrg)}>
-          <Text style={styles.devToggle}>
-            Switch to {isOrg ? "Volunteer" : "Org"} (Dev)
-          </Text>
         </TouchableOpacity>
       </View>
 
@@ -367,7 +360,14 @@ export default function ProfilePage() {
           <Text style={styles.saveText}>Save Changes</Text>
         </TouchableOpacity>
 
-        {/* Padding for bottom */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handleSignOut}
+          style={styles.signOutBtn}
+        >
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -441,11 +441,6 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontSize: 16,
     fontWeight: "600",
-  },
-  devToggle: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    textDecorationLine: "underline",
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -577,6 +572,28 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  signOutBtn: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: DANGER,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    marginBottom: 40,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  signOutText: {
+    color: DANGER,
     fontSize: 16,
     fontWeight: "700",
   },

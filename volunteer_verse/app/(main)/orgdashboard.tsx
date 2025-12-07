@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { supabase } from "../../utils/supabase";
 
 type EventItem = {
   id: string;
@@ -24,6 +25,7 @@ const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
+const DANGER = "#EF4444";
 
 const EVENTS: EventItem[] = [
   {
@@ -57,6 +59,15 @@ export default function OrgDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert("Error signing out", error.message);
+    } else {
+      router.replace("/"); // Go back to login
+    }
+  };
+
   const renderItem = ({ item }: { item: EventItem }) => (
     <EventCard
       event={item}
@@ -75,7 +86,7 @@ export default function OrgDashboard() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            // TODO: remove from backend
+            // TODO: remove from backend; then update local state
             Alert.alert("Deleted", `${event.name} has been deleted.`);
           },
         },
@@ -85,16 +96,18 @@ export default function OrgDashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Profile Button */}
+      {/* Header with Title and Actions */}
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={styles.headerTitle}>Your Events</Text>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => router.push("/profilepage")}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.iconText}>👤</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/profilepage?type=org")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.iconText}>👤</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -103,6 +116,15 @@ export default function OrgDashboard() {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={handleSignOut}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        }
       />
 
       <TouchableOpacity
@@ -203,14 +225,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: BG,
-    flexDirection: "row", // Added to align title and icon
-    justifyContent: "space-between", // Push icon to the right
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
     color: TEXT_PRIMARY,
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
   },
   iconBtn: {
     width: 36,
@@ -347,5 +374,27 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     lineHeight: 30,
+  },
+  signOutBtn: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: DANGER,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+    marginBottom: 40,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  signOutText: {
+    color: DANGER,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

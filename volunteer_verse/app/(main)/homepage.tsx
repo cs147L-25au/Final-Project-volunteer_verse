@@ -8,8 +8,10 @@ import {
   Image,
   Animated,
   TextInput,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type AreaKey =
   | "environment"
@@ -99,9 +101,11 @@ const ORGANIZATIONS: Org[] = [
 
 export default function HomePage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [showLikedOnly, setShowLikedOnly] = useState(false);
   const [search, setSearch] = useState("");
+
   const filteredData = useMemo(() => {
     const base = showLikedOnly
       ? ORGANIZATIONS.filter((o) => liked.has(o.id))
@@ -110,14 +114,6 @@ export default function HomePage() {
     if (!q) return base;
     return base.filter((o) => matchesOrg(o, q));
   }, [showLikedOnly, liked, search]);
-
-  const data = useMemo(
-    () =>
-      showLikedOnly
-        ? ORGANIZATIONS.filter((o) => liked.has(o.id))
-        : ORGANIZATIONS,
-    [showLikedOnly, liked]
-  );
 
   const toggleLike = (id: string) => {
     setLiked((prev) => {
@@ -176,18 +172,11 @@ export default function HomePage() {
 
   return (
     <View style={styles.container}>
-      {/* Non-routing header */}
-      <View style={styles.header}>
+      {/* Header with Safe Area Insets */}
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={styles.headerTitle}>Volunteer Verse</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/settings")}
-          >
-            <Text style={styles.iconText}>⚙️</Text>
-          </TouchableOpacity>
-
-          {/* NEW: Calendar Button */}
+          {/* Calendar Button */}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push("/calendar")}
@@ -195,6 +184,16 @@ export default function HomePage() {
             <Text style={styles.iconText}>📅</Text>
           </TouchableOpacity>
 
+          {/* Profile Button */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/profilepage?type=volunteer")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.iconText}>👤</Text>
+          </TouchableOpacity>
+
+          {/* Likes Filter */}
           <TouchableOpacity
             style={[styles.iconBtn, showLikedOnly && { borderColor: HEART }]}
             onPress={() => setShowLikedOnly((v) => !v)}
@@ -206,6 +205,7 @@ export default function HomePage() {
           </TouchableOpacity>
         </View>
       </View>
+
       <View style={styles.searchContainer}>
         <TextInput
           value={search}
@@ -316,13 +316,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    marginTop: "10%",
-    paddingTop: 20,
     paddingBottom: 12,
+    backgroundColor: BG,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: BG,
   },
   headerTitle: {
     fontSize: 22,
@@ -332,6 +330,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     gap: 8,
+    alignItems: "center",
   },
   iconBtn: {
     width: 36,
