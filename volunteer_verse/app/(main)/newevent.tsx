@@ -1,3 +1,4 @@
+import { supabase } from "utils/supabase";
 import React, { useMemo, useState } from "react";
 import {
   View,
@@ -34,6 +35,7 @@ export default function NewEvent() {
   const [startTime, setStartTime] = useState<Date>(defaultStart);
   const [endTime, setEndTime] = useState<Date>(defaultEnd);
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -103,16 +105,46 @@ export default function NewEvent() {
     }
   };
 
-  const handleCreate = () => {
-    if (!canCreate) return;
-    // TODO: Persist event to backend (e.g., Supabase)
-    Alert.alert(
-      "Event created",
-      `“${name}” on ${fmtDate(date)} from ${fmtTime(startTime)} to ${fmtTime(
-        endTime
-      )} has been created.`
-    );
-    router.replace("/orgdashboard");
+  const handleCreate = async () => {
+    if (!canCreate || saving) return;
+    setSaving(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) throw new Error("Not signed in");
+      // Get the org the current user owns/admins (adjust if you support multiple orgs)
+      const { data: org, error: orgErr } = await supabase
+        .from("Org_info")
+        .select("id")
+        .eq("User_id", userId)
+        .maybeSingle();
+
+      if (orgErr) throw orgErr;
+      if (!org?.id) throw new Error("No organization found for this user");
+
+      const { error: insertErr } = await supabase.from("events").insert({
+        org_id: org.id, // bigint FK to Org_info.id
+        name,
+        description,
+        location,
+        start_at: startTime.toISOString(), // timestamptz
+        end_at: endTime.toISOString(), // timestamptz
+      });
+
+      if (insertErr) throw insertErr;
+
+      Alert.alert(
+        "Event created",
+        `“${name}” on ${fmtDate(date)} from ${fmtTime(startTime)} to ${fmtTime(
+          endTime
+        )} has been created.`
+      );
+      router.replace("/orgdashboard");
+    } catch (e: any) {
+      Alert.alert("Error creating event", e.message ?? "Unknown error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -230,8 +262,11 @@ export default function NewEvent() {
           activeOpacity={0.9}
           onPress={handleCreate}
           style={styles.createBtn}
+          disabled={saving}
         >
-          <Text style={styles.createText}>Create Event</Text>
+          <Text style={styles.createText}>
+            {saving ? "Creating..." : "Create Event"}
+          </Text>
         </TouchableOpacity>
       )}
 

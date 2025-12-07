@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   Image,
   Animated,
   TextInput,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { supabase } from "utils/supabase";
 
 type AreaKey =
   | "environment"
@@ -53,71 +55,60 @@ function chipBg(hex: string, alpha = 0.16) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Example data; replace with fetch from your backend
-const ORGANIZATIONS: Org[] = [
-  {
-    id: "org-1",
-    name: "Green Horizons",
-    mission: "Restoring local habitats and promoting sustainable living.",
-    sizeLabel: "30–100 members",
-    location: "San Jose",
-    areas: ["environment", "community"],
-    image:
-      "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=200&q=60",
-  },
-  {
-    id: "org-2",
-    name: "Bright Minds",
-    mission: "Tutoring and after-school programs for underserved youth.",
-    sizeLabel: "10–30 members",
-    location: "Sunnyvale",
-    areas: ["education", "marginalized"],
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=200&q=60",
-  },
-  {
-    id: "org-3",
-    name: "Health for All",
-    mission: "Community health screenings and wellness workshops.",
-    sizeLabel: "100+ members",
-    location: "Mountain View",
-    areas: ["health", "community"],
-    image:
-      "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&q=60",
-  },
-  {
-    id: "org-4",
-    name: "Wildlife Watch",
-    mission: "Protecting local fauna and rescuing endangered species.",
-    sizeLabel: "10+ members",
-    location: "Palo Alto",
-    areas: ["animals", "environment"],
-    image:
-      "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=200&q=60",
-  },
-];
-
 export default function HomePage() {
   const router = useRouter();
+
+  // Hooks must be inside the component
+  const [orgs, setOrgs] = useState<Org[]>([]);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [showLikedOnly, setShowLikedOnly] = useState(false);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("Org_info")
+          .select(
+            "id, org_name, mission_statement, location, website_url, Environment, Health, Education, Animals, Outreach, Marginalized_group, image_url, org_size"
+          );
+        if (error) throw error;
+        const mapped: Org[] = (data ?? []).map((r: any) => ({
+          id: String(r.id),
+          name: r.org_name ?? "Unnamed",
+          mission: r.mission_statement ?? "",
+          sizeLabel: r.org_size ?? "n/a",
+          location: r.location ?? "",
+          areas: toAreas(r),
+          image:
+            r.image_url ||
+            "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg",
+        }));
+        if (active) setOrgs(mapped);
+      } catch (e: any) {
+        Alert.alert("Error", e.message ?? "Failed to load organizations");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const filteredData = useMemo(() => {
-    const base = showLikedOnly
-      ? ORGANIZATIONS.filter((o) => liked.has(o.id))
-      : ORGANIZATIONS;
+    const base = showLikedOnly ? orgs.filter((o) => liked.has(o.id)) : orgs;
     const q = search.trim().toLowerCase();
     if (!q) return base;
-    return base.filter((o) => matchesOrg(o, q));
-  }, [showLikedOnly, liked, search]);
-
-  const data = useMemo(
-    () =>
-      showLikedOnly
-        ? ORGANIZATIONS.filter((o) => liked.has(o.id))
-        : ORGANIZATIONS,
-    [showLikedOnly, liked]
-  );
+    return base.filter((o) => {
+      const fields = [
+        o.name,
+        o.mission,
+        o.location,
+        ...o.areas.map(labelForArea),
+      ].filter(Boolean);
+      return fields.some((t) => t.toLowerCase().includes(q));
+    });
+  }, [orgs, showLikedOnly, liked, search]);
 
   const toggleLike = (id: string) => {
     setLiked((prev) => {
@@ -167,8 +158,6 @@ export default function HomePage() {
             ))}
           </View>
         </View>
-
-        {/* Card heart button */}
         <CardHeart liked={isLiked} onToggle={() => toggleLike(item.id)} />
       </TouchableOpacity>
     );
@@ -176,7 +165,6 @@ export default function HomePage() {
 
   return (
     <View style={styles.container}>
-      {/* Non-routing header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Volunteer Verse</Text>
         <View style={styles.headerActions}>
@@ -201,7 +189,7 @@ export default function HomePage() {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Search by name, mission, domain, or location"
+          placeholder="Search by name, mission, area, or location"
           placeholderTextColor="#9CA3AF"
           style={styles.searchInput}
           autoCapitalize="none"
@@ -209,6 +197,7 @@ export default function HomePage() {
           clearButtonMode="while-editing"
         />
       </View>
+
       <FlatList
         data={filteredData}
         keyExtractor={(item) => item.id}
@@ -228,7 +217,6 @@ function CardHeart({
   onToggle: () => void;
 }) {
   const scale = React.useRef(new Animated.Value(1)).current;
-
   const press = () => {
     Animated.sequence([
       Animated.spring(scale, {
@@ -246,7 +234,6 @@ function CardHeart({
     ]).start();
     onToggle();
   };
-
   return (
     <TouchableOpacity
       style={styles.cardHeartWrap}
@@ -290,21 +277,19 @@ function labelForArea(a: AreaKey) {
   }
 }
 
-function matchesOrg(org: Org, q: string) {
-  const fields = [
-    org.name,
-    org.mission,
-    org.location,
-    ...org.areas.map(labelForArea),
-  ];
-  return fields.some((t) => t.toLowerCase().includes(q));
+function toAreas(r: any): AreaKey[] {
+  const areas: AreaKey[] = [];
+  if (r.Environment) areas.push("environment");
+  if (r.Education) areas.push("education");
+  if (r.Health) areas.push("health");
+  if (r.Animals) areas.push("animals");
+  if (r.Outreach) areas.push("community");
+  if (r.Marginalized_group) areas.push("marginalized");
+  return areas;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+  container: { flex: 1, backgroundColor: BG },
   header: {
     paddingHorizontal: 20,
     marginTop: "10%",
@@ -315,15 +300,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: BG,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: TEXT_PRIMARY,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: TEXT_PRIMARY },
+  headerActions: { flexDirection: "row", gap: 8 },
   iconBtn: {
     width: 36,
     height: 36,
@@ -339,13 +317,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
-  iconText: {
-    fontSize: 18,
+  iconText: { fontSize: 18 },
+  searchContainer: { paddingHorizontal: 20, paddingBottom: 8 },
+  searchInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: BORDER,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: TEXT_PRIMARY,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-  },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120 },
   row: {
     position: "relative",
     flexDirection: "row",
@@ -362,40 +351,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-  },
-  info: {
-    flex: 1,
-    paddingRight: 48, // leave space so heart doesn’t overlap text
-  },
+  logo: { width: 64, height: 64, borderRadius: 12, backgroundColor: "#FFF" },
+  info: { flex: 1, paddingRight: 48 },
   name: {
     fontSize: 18,
     fontWeight: "700",
     color: TEXT_PRIMARY,
     marginBottom: 2,
   },
-  mission: {
-    fontSize: 14,
-    color: TEXT_SECONDARY,
-    marginBottom: 8,
-  },
-  metaRow: {
-    marginBottom: 8,
-  },
-  meta: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  mission: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 8 },
+  metaRow: { marginBottom: 8 },
+  meta: { fontSize: 13, color: "#6B7280", fontWeight: "600" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -405,24 +372,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 6,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  chipLabel: {
-    fontSize: 12.5,
-    color: TEXT_PRIMARY,
-    fontWeight: "600",
-  },
-  separator: {
-    height: 12,
-  },
-  cardHeartWrap: {
-    position: "absolute",
-    right: 12,
-    bottom: 12,
-  },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  chipLabel: { fontSize: 12.5, color: TEXT_PRIMARY, fontWeight: "600" },
+  separator: { height: 12 },
+  cardHeartWrap: { position: "absolute", right: 12, bottom: 12 },
   cardHeart: {
     width: 36,
     height: 36,
@@ -437,24 +390,5 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-  searchInput: {
-    backgroundColor: "#FFFFFF",
-    borderColor: BORDER,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: TEXT_PRIMARY,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
   },
 });

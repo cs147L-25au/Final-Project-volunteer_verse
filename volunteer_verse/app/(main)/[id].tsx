@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Linking,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { supabase } from "utils/supabase";
 
 type AreaKey =
   | "environment"
@@ -23,9 +24,9 @@ type EventItem = {
   id: string;
   name: string;
   description: string;
-  location: string; // specific event location
-  startISO: string; // start datetime ISO
-  endISO: string; // end datetime ISO
+  location: string;
+  startISO: string;
+  endISO: string;
 };
 
 type Org = {
@@ -33,65 +34,9 @@ type Org = {
   name: string;
   mission: string;
   location: string;
-  website: string;
+  website?: string;
   areas: AreaKey[];
   image: string;
-  events: EventItem[];
-};
-
-// Example data; replace with real fetch
-const ORGS: Record<string, Org> = {
-  "org-1": {
-    id: "org-1",
-    name: "Green Horizons",
-    mission: "Restoring local habitats and promoting sustainable living.",
-    location: "San Jose",
-    website: "https://greenhorizons.example.org",
-    areas: ["environment", "community"],
-    image:
-      "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=800&q=60",
-    events: [
-      {
-        id: "e-1",
-        name: "Creek Cleanup",
-        description:
-          "Help us remove trash and invasive plants from the local creek. Gloves and tools provided.",
-        location: "Guadalupe River Park, San Jose",
-        startISO: "2025-01-20T09:00:00",
-        endISO: "2025-01-20T12:00:00",
-      },
-      {
-        id: "e-2",
-        name: "Tree Planting Day",
-        description:
-          "Join us to plant native trees and learn about habitat restoration.",
-        location: "Almaden Quicksilver Park",
-        startISO: "2025-02-05T10:00:00",
-        endISO: "2025-02-05T14:00:00",
-      },
-    ],
-  },
-  "org-2": {
-    id: "org-2",
-    name: "Bright Minds",
-    mission: "Tutoring and after-school programs for underserved youth.",
-    location: "Sunnyvale",
-    website: "https://brightminds.example.org",
-    areas: ["education", "marginalized"],
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=60",
-    events: [
-      {
-        id: "e-3",
-        name: "STEM Workshop",
-        description:
-          "Hands-on science and coding activities for middle schoolers.",
-        location: "Sunnyvale Community Center",
-        startISO: "2025-01-28T13:00:00",
-        endISO: "2025-01-28T16:00:00",
-      },
-    ],
-  },
 };
 
 const ACCENT = "#5865F2";
@@ -102,7 +47,103 @@ const BORDER = "#E5E7EB";
 
 export default function OrgDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const org = ORGS[String(id)];
+  const numericId = Number(id);
+
+  const [org, setOrg] = useState<Org | null>(null);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    if (!numericId || Number.isNaN(numericId)) {
+      setLoading(false);
+      setOrg(null);
+      return;
+    }
+    (async () => {
+      try {
+        // Fetch organization
+        const { data: orgRow, error: orgErr } = await supabase
+          .from("Org_info")
+          .select(
+            "id, org_name, mission_statement, location, website_url, image_url, Environment, Health, Education, Animals, Outreach, Marginalized_group"
+          )
+          .eq("id", numericId)
+          .maybeSingle();
+        if (orgErr) throw orgErr;
+        if (!orgRow) {
+          if (active) {
+            setOrg(null);
+            setEvents([]);
+          }
+          return;
+        }
+
+        const areas: AreaKey[] = [];
+        if (orgRow.Environment) areas.push("environment");
+        if (orgRow.Education) areas.push("education");
+        if (orgRow.Health) areas.push("health");
+        if (orgRow.Animals) areas.push("animals");
+        if (orgRow.Outreach) areas.push("community");
+        if (orgRow.Marginalized_group) areas.push("marginalized");
+
+        const mappedOrg: Org = {
+          id: String(orgRow.id),
+          name: orgRow.org_name ?? "Unnamed",
+          mission: orgRow.mission_statement ?? "",
+          location: orgRow.location ?? "",
+          website: orgRow.website_url?.startsWith("http")
+            ? orgRow.website_url
+            : undefined,
+          image:
+            orgRow.image_url ||
+            "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg",
+          areas,
+        };
+        if (active) setOrg(mappedOrg);
+
+        // Fetch events for this org
+        const { data: evRows, error: evErr } = await supabase
+          .from("events")
+          .select("id,name,description,location,start_at,end_at")
+          .eq("org_id", numericId)
+          .order("start_at", { ascending: true });
+
+        if (evErr) throw evErr;
+
+        const mappedEvents: EventItem[] = (evRows ?? []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          description: row.description ?? "",
+          location: row.location ?? "",
+          startISO: row.start_at,
+          endISO: row.end_at,
+        }));
+
+        if (active) setEvents(mappedEvents);
+      } catch (e: any) {
+        Alert.alert("Error", e.message ?? "Failed to load organization");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [numericId]);
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <Text style={{ color: TEXT_SECONDARY }}>Loading…</Text>
+      </View>
+    );
+  }
 
   if (!org) {
     return (
@@ -122,7 +163,6 @@ export default function OrgDetails() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>{org.name}</Text>
         <Image source={{ uri: org.image }} style={styles.hero} />
-
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Mission</Text>
           <Text style={styles.mission}>{org.mission}</Text>
@@ -132,18 +172,20 @@ export default function OrgDetails() {
           <InfoItem label="Location" value={org.location} />
           <InfoItem
             label="Website"
-            value={org.website}
-            onPress={() => Linking.openURL(org.website)}
-            pressable
+            value={org.website || "No URL provided"}
+            onPress={
+              org.website ? () => Linking.openURL(org.website!) : undefined
+            }
+            pressable={Boolean(org.website)}
           />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Events</Text>
-          {org.events.length === 0 ? (
+          {events.length === 0 ? (
             <Text style={styles.empty}>No upcoming events.</Text>
           ) : (
-            org.events.map((ev) => <EventCard key={ev.id} event={ev} />)
+            events.map((ev) => <EventCard key={ev.id} event={ev} />)
           )}
         </View>
 
@@ -228,7 +270,6 @@ function EventCard({ event }: { event: EventItem }) {
       weekday: "long",
       month: "short",
       day: "numeric",
-      //year: "numeric",
     });
     Alert.alert(
       "Registration",
@@ -323,15 +364,8 @@ function fmtTime(d: Date) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
+  container: { flex: 1, backgroundColor: BG },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
   title: {
     fontSize: 24,
     fontWeight: "800",
@@ -345,26 +379,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     marginBottom: 16,
   },
-  section: {
-    marginTop: 8,
-  },
+  section: { marginTop: 8 },
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
     color: TEXT_PRIMARY,
     marginBottom: 8,
   },
-  mission: {
-    fontSize: 14.5,
-    color: TEXT_SECONDARY,
-    lineHeight: 20,
-  },
-  rowInfo: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 14,
-    flexWrap: "wrap",
-  },
+  mission: { fontSize: 14.5, color: TEXT_SECONDARY, lineHeight: 20 },
+  rowInfo: { flexDirection: "row", gap: 12, marginTop: 14, flexWrap: "wrap" },
   infoItem: {
     flexGrow: 1,
     minWidth: "44%",
@@ -385,19 +408,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 4,
   },
-  infoValue: {
-    fontSize: 14.5,
-    color: TEXT_PRIMARY,
-    fontWeight: "600",
-  },
-  link: {
-    color: ACCENT,
-  },
-  empty: {
-    fontSize: 14,
-    color: "#6B7280",
-    textAlign: "center",
-  },
+  infoValue: { fontSize: 14.5, color: TEXT_PRIMARY, fontWeight: "600" },
+  link: { color: ACCENT },
+  empty: { fontSize: 14, color: "#6B7280", textAlign: "center" },
   eventCard: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -411,34 +424,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
-  eventHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
+  eventHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   eventName: {
     fontSize: 16.5,
     fontWeight: "700",
     color: TEXT_PRIMARY,
     marginBottom: 2,
   },
-  eventMeta: {
-    fontSize: 13.5,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
-  eventLocation: {
-    fontSize: 13.5,
-    color: TEXT_SECONDARY,
-  },
-  chevron: {
-    fontSize: 18,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  eventBody: {
-    marginTop: 12,
-  },
+  eventMeta: { fontSize: 13.5, color: "#6B7280", marginBottom: 4 },
+  eventLocation: { fontSize: 13.5, color: TEXT_SECONDARY },
+  chevron: { fontSize: 18, color: "#9CA3AF", marginTop: 2 },
+  eventBody: { marginTop: 12 },
   eventDesc: {
     fontSize: 14,
     color: TEXT_SECONDARY,
@@ -451,11 +447,7 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY,
     marginBottom: 6,
   },
-  slotsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  slotsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   slot: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -464,11 +456,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 10,
   },
-  slotText: {
-    fontSize: 13,
-    color: TEXT_SECONDARY,
-    fontWeight: "600",
-  },
+  slotText: { fontSize: 13, color: TEXT_SECONDARY, fontWeight: "600" },
   registerBtn: {
     marginTop: 12,
     backgroundColor: ACCENT,
