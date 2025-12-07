@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { supabase } from "../../../utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -23,12 +25,97 @@ export default function NewOrganization() {
   const [orgName, setOrgName] = useState("");
   const [city, setCity] = useState("");
   const [mission, setMission] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const canContinue = Boolean(orgName.trim() && city.trim() && mission.trim());
 
-  const handleNext = () => {
-    if (!canContinue) return;
-    router.push("/accountinfo");
+  const handleNext = async () => {
+    if (!canContinue || submitting) return;
+
+    setSubmitting(true);
+    const payload = {
+      org_name: orgName.trim(),
+      mission_statement: mission.trim(),
+      location: city.trim(),
+    };
+
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const userId = userData.user?.id;
+      if (!userId) {
+        throw new Error("No authenticated user found. Please log in again.");
+      }
+
+      // Ensure the user_info_ table marks this account as an organization
+      const { data: userInfo, error: fetchUserInfoError } = await supabase
+        .from("user_info_")
+        .select("id")
+        .eq("user_auth_id", userId)
+        .limit(1);
+
+      if (fetchUserInfoError) {
+        throw fetchUserInfoError;
+      }
+
+      if (userInfo && userInfo.length > 0) {
+        const { error: updateUserInfoError } = await supabase
+          .from("user_info_")
+          .update({ org_bool: true })
+          .eq("id", userInfo[0].id);
+
+        if (updateUserInfoError) {
+          throw updateUserInfoError;
+        }
+      } else {
+        const { error: insertUserInfoError } = await supabase
+          .from("user_info_")
+          .insert([{ user_auth_id: userId, org_bool: true }]);
+
+        if (insertUserInfoError) {
+          throw insertUserInfoError;
+        }
+      }
+
+      const { data: existing, error: fetchError } = await supabase
+        .from("Org_info")
+        .select("id")
+        .eq("User_id", userId)
+        .limit(1);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (existing && existing.length > 0) {
+        const { error: updateError } = await supabase
+          .from("Org_info")
+          .update(payload)
+          .eq("id", existing[0].id);
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from("Org_info")
+          .insert([{ ...payload, User_id: userId }]);
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      router.push("/accountinfo");
+    } catch (err) {
+      console.error("Failed to save organization info", err);
+      Alert.alert(
+        "Unable to save",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const goBack = () => {
@@ -93,10 +180,12 @@ export default function NewOrganization() {
         <TouchableOpacity
           accessibilityRole="button"
           onPress={handleNext}
-          style={styles.nextButton}
+          style={[styles.nextButton, submitting && { opacity: 0.7 }]}
           activeOpacity={0.9}
         >
-          <Text style={styles.nextText}>Next</Text>
+          <Text style={styles.nextText}>
+            {submitting ? "Saving..." : "Next"}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -117,6 +206,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
+    paddingTop: 20
   },
   backText: {
     color: ACCENT,
