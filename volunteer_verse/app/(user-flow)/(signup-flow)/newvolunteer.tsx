@@ -1,3 +1,4 @@
+// SECOND PAGE OF SIGNUP, user selects the areas they are interested in impacting.
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: "flex-start",
-    marginTop: 14,
+    marginTop: "10%",
     paddingVertical: 8,
     paddingHorizontal: 10,
   },

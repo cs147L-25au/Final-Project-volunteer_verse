@@ -1,3 +1,6 @@
+// FIRST PAGE OF THE APP.
+// The user can login as a volunteer or organization,
+// or choose to make a new account.
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -22,7 +25,10 @@ export default function Login() {
 
   const signInWithEmail = async () => {
     if (!role) {
-      Alert.alert("Choose a role", "Select volunteer or organization to continue.");
+      Alert.alert(
+        "Choose a role",
+        "Select volunteer or organization to continue."
+      );
       return;
     }
     setLoading(true);
@@ -90,7 +96,9 @@ export default function Login() {
             autoCapitalize={"none"}
             style={styles.input}
           />
-          <Text style={[styles.sectionLabel, styles.labelSpacing]}>Password</Text>
+          <Text style={[styles.sectionLabel, styles.labelSpacing]}>
+            Password
+          </Text>
           <TextInput
             onChangeText={(text) => setPassword(text)}
             value={password}
@@ -103,14 +111,21 @@ export default function Login() {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity onPress={signInWithEmail} disabled={isSignInDisabled}>
+          <TouchableOpacity
+            onPress={signInWithEmail}
+            disabled={isSignInDisabled}
+          >
             <Text
               style={[
                 styles.button,
                 isSignInDisabled ? styles.buttonDisabled : undefined,
               ]}
             >
-              {role ? `Sign in as ${role === "volunteer" ? "Volunteer" : "Organization"}` : "Choose a role to continue"}
+              {role
+                ? `Sign in as ${
+                    role === "volunteer" ? "Volunteer" : "Organization"
+                  }`
+                : "Choose a role to continue"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -145,7 +160,12 @@ function RoleCard({
       <Text style={[styles.roleLabel, selected && styles.roleLabelSelected]}>
         {label}
       </Text>
-      <Text style={[styles.roleDescription, selected && styles.roleDescriptionSelected]}>
+      <Text
+        style={[
+          styles.roleDescription,
+          selected && styles.roleDescriptionSelected,
+        ]}
+      >
         {description}
       </Text>
     </TouchableOpacity>

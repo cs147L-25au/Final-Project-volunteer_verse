@@ -1,3 +1,5 @@
+// (4th) Final page of organization OR volunteer signup flow.
+// Enter username and password and continue to login screen.
 import React, { useState } from "react";
 import {
   View,
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: "flex-start",
-    marginBottom: 10,
+    marginTop: "10%",
     paddingVertical: 8,
     paddingHorizontal: 10,
   },

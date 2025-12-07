@@ -1,3 +1,5 @@
+// THIRD PAGE OF SIGNUP, user enters their name, date of birth, and takes or chooses picture.
+// Continues to accountinfo.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -93,6 +95,7 @@ export default function UserInfo() {
   };
 
   const goBack = () => {
+    console.log("Back button pressed");
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -251,7 +254,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: "flex-start",
-    marginBottom: 10,
+    marginTop: "10%",
     paddingVertical: 8,
     paddingHorizontal: 10,
   },

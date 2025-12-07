@@ -1,3 +1,4 @@
+// main page for users to view a list of organizations
 import React from "react";
 import {
   View,
