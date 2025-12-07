@@ -25,7 +25,7 @@ const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
-const DANGER = "#EF4444";
+// const DANGER = "#EF4444"; // Removed unused color
 
 const EVENTS: EventItem[] = [
   {
@@ -60,11 +60,12 @@ export default function OrgDashboard() {
   const insets = useSafeAreaInsets();
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert("Error signing out", error.message);
-    } else {
-      router.replace("/"); // Go back to login
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log("Sign out error (ignoring):", error);
+    } finally {
+      router.replace("/");
     }
   };
 
@@ -116,15 +117,7 @@ export default function OrgDashboard() {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListFooterComponent={
-          <TouchableOpacity
-            style={styles.signOutBtn}
-            onPress={handleSignOut}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
-        }
+        // Removed ListFooterComponent (Sign Out Button)
       />
 
       <TouchableOpacity
@@ -374,27 +367,5 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     lineHeight: 30,
-  },
-  signOutBtn: {
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: DANGER,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 24,
-    marginBottom: 40,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  signOutText: {
-    color: DANGER,
-    fontSize: 16,
-    fontWeight: "700",
   },
 });
