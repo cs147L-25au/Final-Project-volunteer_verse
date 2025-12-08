@@ -54,7 +54,10 @@ export default function NewVolunteer() {
 
   const handleNext = () => {
     if (!canContinue) return;
-    router.push("/userinfo");
+    router.push({
+      pathname: "/userinfo",
+      params: { interests: selected.join(",") },
+    });
   };
 
   const goBack = () => {

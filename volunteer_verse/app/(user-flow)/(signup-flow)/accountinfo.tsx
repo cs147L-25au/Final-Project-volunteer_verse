@@ -22,11 +22,20 @@ const BORDER = "#E5E7EB";
 export default function AccountInfo() {
   const router = useRouter();
   // Params from usertype.tsx (role + optional next)
-  const { role, next, firstName: firstNameParam, lastName: lastNameParam } = useLocalSearchParams<{
+  const {
+    role,
+    next,
+    firstName: firstNameParam,
+    lastName: lastNameParam,
+    location: locationParam,
+    interests: interestsParam,
+  } = useLocalSearchParams<{
     role?: string;
     next?: string;
     firstName?: string;
     lastName?: string;
+    location?: string;
+    interests?: string;
   }>();
   const isOrg = next === "neworganization" || role === "organization";
   const destination = isOrg ? "/neworganization" : "/(user-flow)";
@@ -136,10 +145,22 @@ export default function AccountInfo() {
           .limit(1);
         if (fetchValError) throw fetchValError;
 
+        const selectedAreas = (interestsParam as string | undefined)
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
         const valPayload = {
           User_id: userId,
           "First Name": (firstNameParam as string | undefined)?.trim() || null,
           "Last Name": (lastNameParam as string | undefined)?.trim() || null,
+          location: (locationParam as string | undefined)?.trim() || null,
+          Environment: selectedAreas?.includes("environment") ?? false,
+          Health: selectedAreas?.includes("health") ?? false,
+          Education: selectedAreas?.includes("education") ?? false,
+          Animals: selectedAreas?.includes("animals") ?? false,
+          Outreach: selectedAreas?.includes("community") ?? false,
+          Marginalized_group: selectedAreas?.includes("marginalized") ?? false,
         };
 
         if (existingVal && existingVal.length > 0) {

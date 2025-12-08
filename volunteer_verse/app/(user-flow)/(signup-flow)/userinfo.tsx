@@ -9,7 +9,7 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -19,12 +19,16 @@ const BORDER = "#E5E7EB";
 
 export default function UserInfo() {
   const router = useRouter();
+  const { interests: interestsParam } = useLocalSearchParams<{
+    interests?: string;
+  }>();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [location, setLocation] = useState("");
 
   const canContinue = Boolean(
-    firstName.trim() && lastName.trim()
+    firstName.trim() && lastName.trim() && location.trim()
   );
 
   const handleNext = () => {
@@ -35,6 +39,8 @@ export default function UserInfo() {
         role: "volunteer",
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        location: location.trim(),
+        interests: interestsParam || "",
       },
     });
   };
@@ -73,11 +79,18 @@ export default function UserInfo() {
             placeholderTextColor="#9CA3AF"
             style={styles.input}
           />
+          <TextInput
+            value={location}
+            onChangeText={setLocation}
+            placeholder="City / Region"
+            placeholderTextColor="#9CA3AF"
+            style={styles.input}
+          />
         </View>
 
         {!canContinue && (
           <Text style={styles.hint}>
-            Please fill out your first and last name to proceed
+            Please fill out your first name, last name, and location to proceed
           </Text>
         )}
 
