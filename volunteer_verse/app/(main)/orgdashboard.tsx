@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,18 +6,19 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { supabase } from "../../utils/supabase";
+import { useRouter, useFocusEffect } from "expo-router";
+import { createClient } from "@supabase/supabase-js";
+import { supabase } from "utils/supabase";
 
 type EventItem = {
   id: string;
   name: string;
   description: string;
-  location: string; // specific event location
-  startISO: string; // start datetime ISO
-  endISO: string; // end datetime ISO
+  location: string;
+  startISO: string;
+  endISO: string;
 };
 
 const ACCENT = "#5865F2";
@@ -25,57 +26,66 @@ const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
-// const DANGER = "#EF4444"; // Removed unused color
-
-const EVENTS: EventItem[] = [
-  {
-    id: "e-101",
-    name: "Community Health Screening",
-    description:
-      "Provide basic health screenings and wellness guidance to local residents.",
-    location: "Downtown Community Clinic",
-    startISO: "2025-01-25T09:00:00",
-    endISO: "2025-01-25T12:00:00",
-  },
-  {
-    id: "e-102",
-    name: "Fundraising Gala",
-    description: "Annual gala to raise funds for our outreach programs.",
-    location: "City Hall Ballroom",
-    startISO: "2025-02-10T18:00:00",
-    endISO: "2025-02-10T21:00:00",
-  },
-  {
-    id: "e-103",
-    name: "Park Cleanup",
-    description: "Join us to keep our parks clean and welcoming.",
-    location: "Liberty Park",
-    startISO: "2025-02-18T10:00:00",
-    endISO: "2025-02-18T13:00:00",
-  },
-];
 
 export default function OrgDashboard() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleSignOut = async () => {
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.log("Sign out error (ignoring):", error);
-    } finally {
-      router.replace("/");
-    }
-  };
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) throw new Error("Not signed in");
+      const { data: org, error: orgErr } = await supabase
+        .from("Org_info")
+        .select("id")
+        .eq("User_id", userId)
+        .maybeSingle();
 
-  const renderItem = ({ item }: { item: EventItem }) => (
-    <EventCard
-      event={item}
-      onEdit={() => router.push(`/editevent/${item.id}`)}
-      onDelete={() => confirmDelete(item)}
-    />
+      if (orgErr) throw orgErr;
+      if (!org?.id) throw new Error("No organization found for this user");
+
+      const { data, error } = await supabase
+        .from("events")
+        .select("id,name,description,location,start_at,end_at")
+        .eq("org_id", org.id)
+        .order("start_at", { ascending: true });
+
+      if (error) throw error;
+
+      const mapped = (data ?? []).map(
+        (row: any): EventItem => ({
+          id: row.id,
+          name: row.name,
+          description: row.description ?? "",
+          location: row.location ?? "",
+          startISO: row.start_at,
+          endISO: row.end_at,
+        })
+      );
+
+      setEvents(mapped);
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Failed to load events");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [fetchEvents])
   );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchEvents();
+  };
 
   const confirmDelete = (event: EventItem) => {
     Alert.alert(
@@ -86,14 +96,29 @@ export default function OrgDashboard() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            // TODO: remove from backend; then update local state
-            Alert.alert("Deleted", `${event.name} has been deleted.`);
-          },
+          onPress: () => deleteEvent(event.id),
         },
       ]
     );
   };
+
+  const deleteEvent = async (id: string) => {
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+      if (error) throw error;
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Failed to delete event");
+    }
+  };
+
+  const renderItem = ({ item }: { item: EventItem }) => (
+    <EventCard
+      event={item}
+      onEdit={() => router.push(`/editevent/${item.id}`)} // implement editevent/[id].tsx
+      onDelete={() => confirmDelete(item)}
+    />
+  );
 
   return (
     <View style={styles.container}>
@@ -110,15 +135,37 @@ export default function OrgDashboard() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <FlatList
-        data={EVENTS}
-        keyExtractor={(e) => e.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        // Removed ListFooterComponent (Sign Out Button)
-      />
+      {loading ? (
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <ActivityIndicator color={ACCENT} />
+          <Text style={{ marginTop: 8, color: TEXT_SECONDARY }}>
+            Loading events…
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={events}
+          keyExtractor={(e) => e.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          ListEmptyComponent={
+            <Text
+              style={{
+                color: TEXT_SECONDARY,
+                textAlign: "center",
+                marginTop: 24,
+              }}
+            >
+              No events yet. Tap + to create one.
+            </Text>
+          }
+        />
+      )}
 
       <TouchableOpacity
         activeOpacity={0.9}

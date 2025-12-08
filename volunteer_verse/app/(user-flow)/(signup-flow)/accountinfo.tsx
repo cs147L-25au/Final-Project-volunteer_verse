@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
+import { supabase } from "../../../utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -22,22 +24,48 @@ export default function AccountInfo() {
   // Get the role passed from usertype.tsx
   const { role } = useLocalSearchParams<{ role: string }>();
 
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const showConfirm = password.length > 0;
   const passwordsMatch = confirm.length > 0 && password === confirm;
-  const canContinue = Boolean(email.trim() && password && passwordsMatch);
+  const canContinue = Boolean(
+    username.trim() && email.trim() && password && passwordsMatch
+  );
 
-  const handleNext = () => {
-    if (!canContinue) return;
+  const handleNext = async () => {
+    if (!canContinue || submitting) return;
+    setSubmitting(true);
 
-    // Route based on role passed from previous screen
-    if (role === "volunteer") {
-      router.push("/newvolunteer");
-    } else {
-      router.push("/neworganization");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { username: username.trim() },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert(
+        "Account created",
+        "Check your email for a confirmation link, then log in."
+      );
+      router.replace("/(user-flow)"); // login screen
+    } catch (err) {
+      console.error("Signup failed", err);
+      Alert.alert(
+        "Signup failed",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -68,6 +96,15 @@ export default function AccountInfo() {
             placeholderTextColor="#9CA3AF"
             autoCapitalize="none"
             autoCorrect={false}
+            style={styles.input}
+          />
+
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            placeholderTextColor="#9CA3AF"
+            autoCapitalize="none"
             keyboardType="email-address"
             style={styles.input}
           />
@@ -115,10 +152,12 @@ export default function AccountInfo() {
         <TouchableOpacity
           accessibilityRole="button"
           onPress={handleNext}
-          style={styles.nextButton}
+          style={[styles.nextButton, submitting && { opacity: 0.7 }]}
           activeOpacity={0.9}
         >
-          <Text style={styles.nextText}>Next</Text>
+          <Text style={styles.nextText}>
+            {submitting ? "Creating account..." : "Create account"}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
