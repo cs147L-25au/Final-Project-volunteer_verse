@@ -11,6 +11,7 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "utils/supabase";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type EventItem = {
   id: string;
@@ -29,6 +30,7 @@ const BORDER = "#E5E7EB";
 
 export default function OrgDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

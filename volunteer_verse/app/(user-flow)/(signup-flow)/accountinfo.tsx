@@ -10,7 +10,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../../../utils/supabase";
 
 const ACCENT = "#5865F2";
@@ -21,8 +21,13 @@ const BORDER = "#E5E7EB";
 
 export default function AccountInfo() {
   const router = useRouter();
-  // Get the role passed from usertype.tsx
-  const { role } = useLocalSearchParams<{ role: string }>();
+  // Params from usertype.tsx (role + optional next)
+  const { role, next } = useLocalSearchParams<{
+    role?: string;
+    next?: string;
+  }>();
+  const isOrg = next === "neworganization" || role === "organization";
+  const destination = isOrg ? "/neworganization" : "/(user-flow)";
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -31,9 +36,10 @@ export default function AccountInfo() {
   const [submitting, setSubmitting] = useState(false);
 
   const showConfirm = password.length > 0;
+  const emailValid = email.trim().length >= 6;
   const passwordsMatch = confirm.length > 0 && password === confirm;
   const canContinue = Boolean(
-    username.trim() && email.trim() && password && passwordsMatch
+    username.trim() && emailValid && password && passwordsMatch
   );
 
   const handleNext = async () => {
@@ -41,7 +47,7 @@ export default function AccountInfo() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
@@ -53,11 +59,79 @@ export default function AccountInfo() {
         throw error;
       }
 
+      const userId = data?.user?.id;
+      if (!userId) {
+        throw new Error("Account created, but no user ID was returned.");
+      }
+
+      // Update user_info_ with the chosen role
+      const { data: existingUserInfo, error: fetchUserInfoError } =
+        await supabase
+          .from("user_info_")
+          .select("id")
+          .eq("user_auth_id", userId)
+          .limit(1);
+
+      if (fetchUserInfoError) {
+        throw fetchUserInfoError;
+      }
+
+      if (existingUserInfo && existingUserInfo.length > 0) {
+        const { error: updateUserInfoError } = await supabase
+          .from("user_info_")
+          .update({ org_bool: isOrg })
+          .eq("id", existingUserInfo[0].id);
+
+        if (updateUserInfoError) {
+          throw updateUserInfoError;
+        }
+      } else {
+        const { error: insertUserInfoError } = await supabase
+          .from("user_info_")
+          .insert([{ user_auth_id: userId, org_bool: isOrg }]);
+
+        if (insertUserInfoError) {
+          throw insertUserInfoError;
+        }
+      }
+
+      // If organization, ensure Org_info exists for this user
+      if (isOrg) {
+        const { data: existingOrg, error: fetchOrgError } = await supabase
+          .from("Org_info")
+          .select("id")
+          .eq("User_id", userId)
+          .limit(1);
+
+        if (fetchOrgError) {
+          throw fetchOrgError;
+        }
+
+        if (existingOrg && existingOrg.length > 0) {
+          const { error: updateOrgError } = await supabase
+            .from("Org_info")
+            .update({ org_name: username.trim() || "Organization" })
+            .eq("id", existingOrg[0].id);
+
+          if (updateOrgError) {
+            throw updateOrgError;
+          }
+        } else {
+          const { error: insertOrgError } = await supabase
+            .from("Org_info")
+            .insert([{ User_id: userId, org_name: username.trim() || "Organization" }]);
+
+          if (insertOrgError) {
+            throw insertOrgError;
+          }
+        }
+      }
+
       Alert.alert(
         "Account created",
-        "Check your email for a confirmation link, then log in."
+        "Check your email for a confirmation link, then continue."
       );
-      router.replace("/(user-flow)"); // login screen
+      router.replace(destination);
     } catch (err) {
       console.error("Signup failed", err);
       Alert.alert(
@@ -90,21 +164,21 @@ export default function AccountInfo() {
         <Text style={styles.title}>Create your account</Text>
         <View style={styles.fieldGroup}>
           <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Username"
+            placeholderTextColor="#9CA3AF"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <TextInput
             value={email}
             onChangeText={setEmail}
             placeholder="Email address"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="none"
             autoCorrect={false}
-            style={styles.input}
-          />
-
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor="#9CA3AF"
-            autoCapitalize="none"
             keyboardType="email-address"
             style={styles.input}
           />
@@ -141,7 +215,7 @@ export default function AccountInfo() {
 
         {!canContinue && (
           <Text style={styles.hint}>
-            Please fill out all of the information to proceed
+            Please fill out all of the information (email must be at least 6 characters)
           </Text>
         )}
 

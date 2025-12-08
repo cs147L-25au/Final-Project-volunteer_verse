@@ -11,8 +11,15 @@ export default function Usertype() {
 
   const handleNext = () => {
     if (!role) return;
-    // Send users over to make an account (email/pw)
-    router.push({ pathname: "accountinfo", params: { role } });
+    if (role === "volunteer") {
+      router.push("/newvolunteer");
+    } else {
+      // Org signups: create account first, then continue to org details
+      router.push({
+        pathname: "/accountinfo",
+        params: { role: "organization", next: "neworganization" },
+      });
+    }
   };
 
   const goBack = () => {

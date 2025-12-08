@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -41,6 +41,27 @@ const AREAS: { key: AreaKey; label: string; color: string }[] = [
   { key: "community", label: "Community Outreach", color: "#8B5CF6" },
   { key: "marginalized", label: "Marginalized Groups", color: "#F472B6" },
 ];
+type OrgRow = {
+  id: number;
+  org_name: string | null;
+  mission_statement: string | null;
+  location: string | null;
+  image_url: string | null;
+  Environment?: boolean | null;
+  Health?: boolean | null;
+  Education?: boolean | null;
+  Animals?: boolean | null;
+  Outreach?: boolean | null;
+  Marginalized_group?: boolean | null;
+};
+const AREA_COLUMN_MAP: Record<AreaKey, keyof OrgRow> = {
+  environment: "Environment",
+  education: "Education",
+  health: "Health",
+  animals: "Animals",
+  community: "Outreach",
+  marginalized: "Marginalized_group",
+};
 
 function hexToRgba(hex: string, alpha = 0.14) {
   const h = hex.replace("#", "");
@@ -76,10 +97,13 @@ export default function ProfilePage() {
   const [mission, setMission] = useState(
     "Restoring local habitats and promoting sustainable living for a greener future."
   );
+  const [orgId, setOrgId] = useState<number | null>(null);
 
   // --- Date Picker State ---
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(dob);
+  const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   // --- Handlers ---
 
@@ -123,16 +147,182 @@ export default function ProfilePage() {
     );
   };
 
-  const handleSave = () => {
-    Alert.alert("Success", "Your profile has been updated.");
+  useEffect(() => {
+    if (!isOrg) return;
+    let active = true;
+
+    const loadOrg = async () => {
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const userId = sessionData.session?.user?.id;
+        if (!userId) {
+          Alert.alert(
+            "Please log in",
+            "Sign in to view your organization profile."
+          );
+          router.replace("/(user-flow)");
+          return;
+        }
+
+        const { data: org, error: orgError } = await supabase
+          .from("Org_info")
+          .select(
+            "id, org_name, mission_statement, location, image_url, Environment, Health, Education, Animals, Outreach, Marginalized_group"
+          )
+          .eq("User_id", userId)
+          .maybeSingle();
+
+        if (orgError) throw orgError;
+        if (!active || !org) return;
+
+        setOrgId(org.id ?? null);
+        setOrgName(org.org_name ?? "");
+        setLocation(org.location ?? "");
+        setMission(org.mission_statement ?? "");
+        setOLogo(org.image_url ?? null);
+
+        const mappedInterests = Object.entries(AREA_COLUMN_MAP)
+          .filter(([_, col]) => Boolean((org as any)[col]))
+          .map(([k]) => k as AreaKey);
+        setInterests(mappedInterests);
+      } catch (err) {
+        console.error("Failed to load organization profile", err);
+        Alert.alert(
+          "Unable to load profile",
+          err instanceof Error ? err.message : "Please try again."
+        );
+      }
+    };
+
+    loadOrg();
+    return () => {
+      active = false;
+    };
+  }, [isOrg, router]);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (isOrg) {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const userId = sessionData.session?.user?.id;
+        if (!userId) {
+          throw new Error("No authenticated user. Please log in again.");
+        }
+
+        // Update user_info_ org flag
+        const { data: existingUserInfo, error: fetchUserInfoError } =
+          await supabase
+            .from("user_info_")
+            .select("id")
+            .eq("user_auth_id", userId)
+            .limit(1);
+        if (fetchUserInfoError) throw fetchUserInfoError;
+        if (existingUserInfo && existingUserInfo.length > 0) {
+          const { error: updateUserInfoError } = await supabase
+            .from("user_info_")
+            .update({ org_bool: true })
+            .eq("id", existingUserInfo[0].id);
+          if (updateUserInfoError) throw updateUserInfoError;
+        } else {
+          const { error: insertUserInfoError } = await supabase
+            .from("user_info_")
+            .insert([{ user_auth_id: userId, org_bool: true }]);
+          if (insertUserInfoError) throw insertUserInfoError;
+        }
+
+        // Prepare interests payload
+        const interestPayload = Object.fromEntries(
+          Object.entries(AREA_COLUMN_MAP).map(([k, col]) => [
+            col,
+            interests.includes(k as AreaKey),
+          ])
+        );
+
+        const orgPayload = {
+          org_name: orgName.trim() || null,
+          mission_statement: mission.trim() || null,
+          location: location.trim() || null,
+          image_url: oLogo,
+          User_id: userId,
+          ...interestPayload,
+        };
+
+        if (orgId) {
+          const { error: updateOrgError } = await supabase
+            .from("Org_info")
+            .update(orgPayload)
+            .eq("id", orgId);
+          if (updateOrgError) throw updateOrgError;
+        } else {
+          const { data: inserted, error: insertOrgError } = await supabase
+            .from("Org_info")
+            .insert([orgPayload])
+            .select("id")
+            .maybeSingle();
+          if (insertOrgError) throw insertOrgError;
+          if (inserted?.id) setOrgId(inserted.id);
+        }
+      } else {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const userId = sessionData.session?.user?.id;
+        if (userId) {
+          const { data: existingUserInfo, error: fetchUserInfoError } =
+            await supabase
+              .from("user_info_")
+              .select("id")
+              .eq("user_auth_id", userId)
+              .limit(1);
+          if (fetchUserInfoError) throw fetchUserInfoError;
+          if (existingUserInfo && existingUserInfo.length > 0) {
+            const { error: updateUserInfoError } = await supabase
+              .from("user_info_")
+              .update({ org_bool: false })
+              .eq("id", existingUserInfo[0].id);
+            if (updateUserInfoError) throw updateUserInfoError;
+          } else {
+            await supabase
+              .from("user_info_")
+              .insert([{ user_auth_id: userId, org_bool: false }]);
+          }
+        }
+      }
+
+      Alert.alert("Success", "Your profile has been updated.");
+    } catch (err) {
+      console.error("Failed to save profile", err);
+      Alert.alert(
+        "Unable to save",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert("Error signing out", error.message);
-    } else {
-      router.replace("/");
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      router.replace("/(user-flow)");
+    } catch (err) {
+      Alert.alert(
+        "Error signing out",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -356,16 +546,22 @@ export default function ProfilePage() {
           activeOpacity={0.9}
           onPress={handleSave}
           style={styles.saveBtn}
+          disabled={saving}
         >
-          <Text style={styles.saveText}>Save Changes</Text>
+          <Text style={styles.saveText}>
+            {saving ? "Saving..." : "Save Changes"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleSignOut}
           style={styles.signOutBtn}
+          disabled={signingOut}
         >
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.signOutText}>
+            {signingOut ? "Signing out..." : "Sign Out"}
+          </Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

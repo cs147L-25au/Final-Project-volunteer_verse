@@ -40,11 +40,21 @@ export default function NewOrganization() {
     };
 
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const userId = userData.user?.id;
+      // Require an active session (avoids AuthSessionMissingError)
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const userId = sessionData.session?.user?.id;
       if (!userId) {
-        throw new Error("No authenticated user found. Please log in again.");
+        Alert.alert(
+          "Please log in",
+          "We need you to be signed in before saving your organization. After logging in, we'll bring you back here."
+        );
+        router.replace({
+          pathname: "/(user-flow)",
+          params: { next: "neworganization" },
+        });
+        return;
       }
 
       // Ensure the user_info_ table marks this account as an organization
@@ -106,7 +116,11 @@ export default function NewOrganization() {
         }
       }
 
-      router.push("/accountinfo");
+      Alert.alert(
+        "Organization saved",
+        "Your organization info has been saved. Opening dashboard..."
+      );
+      router.replace("/orgdashboard");
     } catch (err) {
       console.error("Failed to save organization info", err);
       Alert.alert(

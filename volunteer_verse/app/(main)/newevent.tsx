@@ -68,6 +68,14 @@ export default function NewEvent() {
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/homepage");
+    }
+  };
+
   const openDatePicker = () => {
     setTempDate(date);
     setShowDatePicker(true);
@@ -153,6 +161,15 @@ export default function NewEvent() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={goBack}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backText}>Back to feed</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Create a new event</Text>
         <View style={styles.group}>
           <TextInput
@@ -402,6 +419,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: TEXT_PRIMARY,
     marginBottom: 16,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingTop:20 
+  },
+  backText: {
+    color: ACCENT,
+    fontSize: 15,
+    fontWeight: "700",
   },
   group: { gap: 12 },
   input: {
