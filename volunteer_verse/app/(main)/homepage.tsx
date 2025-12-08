@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "utils/supabase";
 
 type AreaKey =
@@ -164,7 +165,7 @@ export default function HomePage() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Volunteer Verse</Text>
         <View style={styles.headerActions}>
@@ -218,7 +219,7 @@ export default function HomePage() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

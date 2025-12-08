@@ -8,12 +8,9 @@ import {
   TextInput,
   Image,
   Alert,
-  Platform,
-  Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "../../utils/supabase";
 
 // Reusing app theme constants
@@ -82,7 +79,8 @@ export default function ProfilePage() {
   );
   const [firstName, setFirstName] = useState("Alex");
   const [lastName, setLastName] = useState("Rivera");
-  const [dob, setDob] = useState<Date>(new Date(1998, 5, 15));
+  const [vLocation, setVLocation] = useState("");
+  const [valId, setValId] = useState<number | null>(null);
   const [interests, setInterests] = useState<AreaKey[]>([
     "environment",
     "animals",
@@ -99,9 +97,6 @@ export default function ProfilePage() {
   );
   const [orgId, setOrgId] = useState<number | null>(null);
 
-  // --- Date Picker State ---
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState<Date>(dob);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -202,6 +197,56 @@ export default function ProfilePage() {
     };
   }, [isOrg, router]);
 
+  useEffect(() => {
+    if (isOrg) return;
+    let active = true;
+    const loadVolunteer = async () => {
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const userId = sessionData.session?.user?.id;
+        if (!userId) {
+          Alert.alert("Please log in", "Sign in to view your profile.");
+          router.replace("/(user-flow)");
+          return;
+        }
+
+        const { data: vol, error: volError } = await supabase
+          .from("val_info_")
+          .select(
+            'id, "First Name", "Last Name", location, image_url, Environment, Health, Education, Animals, Outreach, Marginalized_group'
+          )
+          .eq("User_id", userId)
+          .maybeSingle();
+
+        if (volError) throw volError;
+        if (!active || !vol) return;
+
+        setValId(vol.id ?? null);
+        setFirstName((vol["First Name"] as string | null) ?? "");
+        setLastName((vol["Last Name"] as string | null) ?? "");
+        setVLocation(vol.location ?? "");
+        setVPhoto(vol.image_url ?? vPhoto);
+
+        const mappedInterests = Object.entries(AREA_COLUMN_MAP)
+          .filter(([_, col]) => Boolean((vol as any)[col]))
+          .map(([k]) => k as AreaKey);
+        setInterests(mappedInterests);
+      } catch (err) {
+        console.error("Failed to load volunteer profile", err);
+        Alert.alert(
+          "Unable to load profile",
+          err instanceof Error ? err.message : "Please try again."
+        );
+      }
+    };
+    loadVolunteer();
+    return () => {
+      active = false;
+    };
+  }, [isOrg, router, vPhoto]);
+
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
@@ -292,6 +337,38 @@ export default function ProfilePage() {
               .from("user_info_")
               .insert([{ user_auth_id: userId, org_bool: false }]);
           }
+
+          const interestPayload = Object.fromEntries(
+            Object.entries(AREA_COLUMN_MAP).map(([k, col]) => [
+              col,
+              interests.includes(k as AreaKey),
+            ])
+          );
+
+          const volPayload = {
+            User_id: userId,
+            "First Name": firstName.trim() || null,
+            "Last Name": lastName.trim() || null,
+            location: vLocation.trim() || null,
+            image_url: vPhoto,
+            ...interestPayload,
+          };
+
+          if (valId) {
+            const { error: updateVolError } = await supabase
+              .from("val_info_")
+              .update(volPayload)
+              .eq("id", valId);
+            if (updateVolError) throw updateVolError;
+          } else {
+            const { data: inserted, error: insertVolError } = await supabase
+              .from("val_info_")
+              .insert([volPayload])
+              .select("id")
+              .maybeSingle();
+            if (insertVolError) throw insertVolError;
+            if (inserted?.id) setValId(inserted.id);
+          }
         }
       }
 
@@ -327,11 +404,7 @@ export default function ProfilePage() {
   };
 
   const onDateChange = (_: any, selected?: Date) => {
-    if (Platform.OS === "android") setShowDatePicker(false);
-    if (selected) {
-      setDob(selected);
-      setTempDate(selected);
-    }
+    // no-op; DOB removed for volunteer view
   };
 
   // --- Render Sections ---
@@ -377,22 +450,13 @@ export default function ProfilePage() {
       </View>
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Date of Birth</Text>
-        <TouchableOpacity
-          style={styles.inputPressable}
-          onPress={() => {
-            setTempDate(dob);
-            setShowDatePicker(true);
-          }}
-        >
-          <Text style={styles.inputText}>
-            {dob.toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.label}>City / Region</Text>
+        <TextInput
+          value={vLocation}
+          onChangeText={setVLocation}
+          placeholder="e.g. San Francisco, CA"
+          style={styles.input}
+        />
       </View>
 
       <View style={styles.fieldGroup}>
@@ -567,52 +631,6 @@ export default function ProfilePage() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Date Picker Modal (iOS) or Component (Android) */}
-      {showDatePicker && Platform.OS === "android" && (
-        <DateTimePicker
-          value={dob}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-        />
-      )}
-
-      <Modal
-        visible={showDatePicker && Platform.OS === "ios"}
-        transparent
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalToolbar}>
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(false)}
-                style={styles.toolbarBtn}
-              >
-                <Text style={styles.toolbarText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setDob(tempDate);
-                  setShowDatePicker(false);
-                }}
-                style={styles.toolbarBtn}
-              >
-                <Text style={styles.toolbarTextAccent}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <DateTimePicker
-              value={tempDate}
-              mode="date"
-              display="spinner"
-              onChange={(_, d) => d && setTempDate(d)}
-              themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
-            />
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -791,37 +809,6 @@ const styles = StyleSheet.create({
   signOutText: {
     color: DANGER,
     fontSize: 16,
-    fontWeight: "700",
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: "#FFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-  },
-  modalToolbar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  toolbarBtn: {
-    padding: 4,
-  },
-  toolbarText: {
-    fontSize: 16,
-    color: TEXT_SECONDARY,
-  },
-  toolbarTextAccent: {
-    fontSize: 16,
-    color: ACCENT,
     fontWeight: "700",
   },
 });

@@ -22,9 +22,11 @@ const BORDER = "#E5E7EB";
 export default function AccountInfo() {
   const router = useRouter();
   // Params from usertype.tsx (role + optional next)
-  const { role, next } = useLocalSearchParams<{
+  const { role, next, firstName: firstNameParam, lastName: lastNameParam } = useLocalSearchParams<{
     role?: string;
     next?: string;
+    firstName?: string;
+    lastName?: string;
   }>();
   const isOrg = next === "neworganization" || role === "organization";
   const destination = isOrg ? "/neworganization" : "/(user-flow)";
@@ -124,6 +126,33 @@ export default function AccountInfo() {
           if (insertOrgError) {
             throw insertOrgError;
           }
+        }
+      } else {
+        // Volunteer: upsert val_info_ with name fields
+        const { data: existingVal, error: fetchValError } = await supabase
+          .from("val_info_")
+          .select("id")
+          .eq("User_id", userId)
+          .limit(1);
+        if (fetchValError) throw fetchValError;
+
+        const valPayload = {
+          User_id: userId,
+          "First Name": (firstNameParam as string | undefined)?.trim() || null,
+          "Last Name": (lastNameParam as string | undefined)?.trim() || null,
+        };
+
+        if (existingVal && existingVal.length > 0) {
+          const { error: updateValError } = await supabase
+            .from("val_info_")
+            .update(valPayload)
+            .eq("id", existingVal[0].id);
+          if (updateValError) throw updateValError;
+        } else {
+          const { error: insertValError } = await supabase
+            .from("val_info_")
+            .insert([valPayload]);
+          if (insertValError) throw insertValError;
         }
       }
 
