@@ -9,7 +9,7 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { supabase } from "utils/supabase";
 
 type AreaKey =
@@ -62,7 +62,6 @@ export default function OrgDetails() {
     }
     (async () => {
       try {
-        // Fetch organization
         const { data: orgRow, error: orgErr } = await supabase
           .from("Org_info")
           .select(
@@ -78,7 +77,6 @@ export default function OrgDetails() {
           }
           return;
         }
-
         const areas: AreaKey[] = [];
         if (orgRow.Environment) areas.push("environment");
         if (orgRow.Education) areas.push("education");
@@ -102,13 +100,11 @@ export default function OrgDetails() {
         };
         if (active) setOrg(mappedOrg);
 
-        // Fetch events for this org
         const { data: evRows, error: evErr } = await supabase
           .from("events")
           .select("id,name,description,location,start_at,end_at")
           .eq("org_id", numericId)
           .order("start_at", { ascending: true });
-
         if (evErr) throw evErr;
 
         const mappedEvents: EventItem[] = (evRows ?? []).map((row: any) => ({
@@ -119,7 +115,6 @@ export default function OrgDetails() {
           startISO: row.start_at,
           endISO: row.end_at,
         }));
-
         if (active) setEvents(mappedEvents);
       } catch (e: any) {
         Alert.alert("Error", e.message ?? "Failed to load organization");
@@ -161,8 +156,11 @@ export default function OrgDetails() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Push the name down using margin */}
         <Text style={styles.title}>{org.name}</Text>
+
         <Image source={{ uri: org.image }} style={styles.hero} />
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Mission</Text>
           <Text style={styles.mission}>{org.mission}</Text>
@@ -233,7 +231,7 @@ function InfoItem({
 
 function EventCard({ event }: { event: EventItem }) {
   const [expanded, setExpanded] = useState(false);
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // slot keys: startISO
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
 
   const start = new Date(event.startISO);
   const end = new Date(event.endISO);
@@ -345,7 +343,7 @@ function EventCard({ event }: { event: EventItem }) {
 
 function buildSlots(start: Date, end: Date) {
   const slots: { start: Date; end: Date }[] = [];
-  const stepMs = 30 * 60 * 1000; // 30 min
+  const stepMs = 30 * 60 * 1000;
   let cur = new Date(start);
   while (cur < end) {
     const next = new Date(cur.getTime() + stepMs);
@@ -365,8 +363,10 @@ function fmtTime(d: Date) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+  // Extra top padding so title sits lower under the translucent header
+  scrollContent: { paddingHorizontal: 20, paddingTop: 72, paddingBottom: 24 },
   title: {
+    marginTop: 12,
     fontSize: 24,
     fontWeight: "800",
     color: TEXT_PRIMARY,

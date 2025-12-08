@@ -8,8 +8,8 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useHeaderHeight } from "@react-navigation/elements";
 
-// Matching the styling constants from homepage.tsx and [id].tsx
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
@@ -26,7 +26,6 @@ type RegisteredEvent = {
   endISO: string;
 };
 
-// Mock data representing locally registered events
 const INITIAL_EVENTS: RegisteredEvent[] = [
   {
     id: "r-1",
@@ -49,6 +48,7 @@ const INITIAL_EVENTS: RegisteredEvent[] = [
 export default function Calendar() {
   const router = useRouter();
   const [events, setEvents] = useState<RegisteredEvent[]>(INITIAL_EVENTS);
+  const headerHeight = useHeaderHeight();
 
   const handleCancel = (eventId: string, eventName: string) => {
     Alert.alert(
@@ -70,19 +70,17 @@ export default function Calendar() {
   const renderItem = ({ item }: { item: RegisteredEvent }) => {
     const start = new Date(item.startISO);
     const end = new Date(item.endISO);
-
     const dateLabel = start.toLocaleDateString(undefined, {
       weekday: "short",
       month: "short",
       day: "numeric",
     });
     const timeLabel = `${fmtTime(start)} - ${fmtTime(end)}`;
-
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.dateBadge}>{dateLabel}</Text>
-          <View style={styles.headerText}>
+          <View style={{ flex: 1 }}>
             <Text style={styles.eventName}>{item.eventName}</Text>
             <Text style={styles.orgName}>by {item.orgName}</Text>
           </View>
@@ -114,28 +112,19 @@ export default function Calendar() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Your Schedule</Text>
-      </View>
-
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>You have no upcoming events.</Text>
             <TouchableOpacity
-              onPress={() => router.push("/homepage")}
+              onPress={() => router.push("/(volunteer)/homepage")}
               style={styles.browseBtn}
+              activeOpacity={0.9}
             >
               <Text style={styles.browseText}>Browse Opportunities</Text>
             </TouchableOpacity>
@@ -158,27 +147,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
-  header: {
-    paddingHorizontal: 20,
-    marginTop: "10%",
-    paddingTop: 10,
-    paddingBottom: 16,
-    backgroundColor: BG,
-  },
-  backButton: {
-    marginBottom: 8,
-    alignSelf: "flex-start",
-  },
-  backText: {
-    color: ACCENT,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: TEXT_PRIMARY,
-  },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -187,7 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: BORDER,
     shadowColor: "#000",
@@ -210,12 +177,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
-    overflow: "hidden",
-    textAlign: "center",
     minWidth: 50,
-  },
-  headerText: {
-    flex: 1,
+    textAlign: "center",
   },
   eventName: {
     fontSize: 17,
@@ -275,6 +238,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   browseText: {
     color: "#FFF",

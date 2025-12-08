@@ -125,7 +125,12 @@ export default function HomePage() {
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => router.push(`/${item.id}`)}
+        onPress={() =>
+          router.push({
+            pathname: "/details/[id]",
+            params: { id: String(item.id) },
+          })
+        }
         style={styles.row}
       >
         <Image source={{ uri: item.image }} style={styles.logo} />
@@ -180,7 +185,12 @@ export default function HomePage() {
           {/* Profile Button */}
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/profilepage?type=volunteer")}
+            onPress={() =>
+              router.push({
+                pathname: "/profile",
+                params: { type: "volunteer" },
+              })
+            }
             activeOpacity={0.8}
           >
             <Text style={styles.iconText}>👤</Text>

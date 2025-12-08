@@ -1,5 +1,4 @@
 // STEP 2: Email & Password
-// Navigates to: New Volunteer OR New Organization (based on role param)
 import React, { useState } from "react";
 import {
   View,
@@ -11,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { supabase } from "../../../utils/supabase";
+import { supabase } from "@/utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -39,8 +38,6 @@ export default function AccountInfo() {
   }>();
   const isOrg = next === "neworganization" || role === "organization";
   const destination = isOrg ? "/neworganization" : "/(user-flow)";
-
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -49,9 +46,7 @@ export default function AccountInfo() {
   const showConfirm = password.length > 0;
   const emailValid = email.trim().length >= 6;
   const passwordsMatch = confirm.length > 0 && password === confirm;
-  const canContinue = Boolean(
-    username.trim() && emailValid && password && passwordsMatch
-  );
+  const canContinue = Boolean(emailValid && password && passwordsMatch);
 
   const handleNext = async () => {
     if (!canContinue || submitting) return;
@@ -61,9 +56,6 @@ export default function AccountInfo() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: {
-          data: { username: username.trim() },
-        },
       });
 
       if (error) {
@@ -121,7 +113,7 @@ export default function AccountInfo() {
         if (existingOrg && existingOrg.length > 0) {
           const { error: updateOrgError } = await supabase
             .from("Org_info")
-            .update({ org_name: username.trim() || "Organization" })
+            .update({ org_name: "Organization" })
             .eq("id", existingOrg[0].id);
 
           if (updateOrgError) {
@@ -130,7 +122,7 @@ export default function AccountInfo() {
         } else {
           const { error: insertOrgError } = await supabase
             .from("Org_info")
-            .insert([{ User_id: userId, org_name: username.trim() || "Organization" }]);
+            .insert([{ User_id: userId, org_name: "Organization" }]);
 
           if (insertOrgError) {
             throw insertOrgError;
@@ -203,25 +195,8 @@ export default function AccountInfo() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
         <Text style={styles.title}>Create your account</Text>
         <View style={styles.fieldGroup}>
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Username"
-            placeholderTextColor="#9CA3AF"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -265,7 +240,8 @@ export default function AccountInfo() {
 
         {!canContinue && (
           <Text style={styles.hint}>
-            Please fill out all of the information (email must be at least 6 characters)
+            Please fill out all of the information (email must be at least 6
+            characters)
           </Text>
         )}
 
@@ -295,7 +271,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    marginTop: "30%",
   },
   backButton: {
     alignSelf: "flex-start",

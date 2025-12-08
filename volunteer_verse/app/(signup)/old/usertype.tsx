@@ -1,4 +1,4 @@
-// STEP 1: Select Role
+// STEP 1: Select Role (Volunteer/Org)
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";

@@ -130,7 +130,9 @@ export default function OrgDashboard() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => router.push("/profilepage?type=org")}
+            onPress={() =>
+              router.push({ pathname: "/profile", params: { type: "org" } })
+            }
             activeOpacity={0.8}
           >
             <Text style={styles.iconText}>👤</Text>
