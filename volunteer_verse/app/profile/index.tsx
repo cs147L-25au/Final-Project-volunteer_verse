@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useHeaderHeight } from "@react-navigation/elements";
 import * as ImagePicker from "expo-image-picker";
-import { supabase } from "../../utils/supabase";
+import { supabase } from "@/utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -28,8 +28,7 @@ type AreaKey =
   | "animals"
   | "community"
   | "marginalized";
-
-const AREAS: { key: AreaKey; label: string; color: string }[] = [
+const AREAS = [
   { key: "environment", label: "Environment", color: "#22C55E" },
   { key: "education", label: "Education", color: "#F59E0B" },
   { key: "health", label: "Health", color: "#EF4444" },
@@ -51,7 +50,6 @@ type OrgRow = {
   Outreach?: boolean | null;
   Marginalized_group?: boolean | null;
 };
-
 type VolRow = {
   id: number;
   "First Name": string | null;
@@ -65,7 +63,6 @@ type VolRow = {
   Outreach?: boolean | null;
   Marginalized_group?: boolean | null;
 };
-
 const AREA_COLUMN_MAP: Record<AreaKey, keyof OrgRow & keyof VolRow> = {
   environment: "Environment",
   education: "Education",
@@ -74,7 +71,6 @@ const AREA_COLUMN_MAP: Record<AreaKey, keyof OrgRow & keyof VolRow> = {
   community: "Outreach",
   marginalized: "Marginalized_group",
 };
-
 const rgba = (hex: string, a = 0.16) => {
   const h = hex.replace("#", "");
   const r = parseInt(h.slice(0, 2), 16);
@@ -82,6 +78,29 @@ const rgba = (hex: string, a = 0.16) => {
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
+function extFromUriOrMime(uri: string, mime?: string) {
+  const fromMime = mime?.includes("png")
+    ? "png"
+    : mime?.includes("webp")
+    ? "webp"
+    : mime?.includes("jpeg") || mime?.includes("jpg")
+    ? "jpg"
+    : undefined;
+  const fromUri = uri
+    .split("?")[0]
+    .split("#")[0]
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+  return (
+    fromMime ||
+    (fromUri === "jpeg" || fromUri === "jpg"
+      ? "jpg"
+      : fromUri === "png" || fromUri === "webp"
+      ? fromUri!
+      : "jpg")
+  );
+}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -89,14 +108,14 @@ export default function ProfilePage() {
   const { type } = useLocalSearchParams<{ type?: string }>();
   const isOrg = type === "org";
 
-  // Volunteer state
+  // Volunteer
   const [vPhoto, setVPhoto] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [vLocation, setVLocation] = useState("");
   const [valId, setValId] = useState<number | null>(null);
 
-  // Organization state
+  // Organization
   const [oLogo, setOLogo] = useState<string | null>(null);
   const [orgName, setOrgName] = useState("");
   const [location, setLocation] = useState("");
@@ -106,6 +125,7 @@ export default function ProfilePage() {
   const [interests, setInterests] = useState<AreaKey[]>([]);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const getUserId = useCallback(async () => {
     const { data, error } = await supabase.auth.getSession();
@@ -115,38 +135,68 @@ export default function ProfilePage() {
     return userId;
   }, []);
 
-  const pickImage = async (setter: (uri: string) => void) => {
-    Alert.alert("Change Photo", "Choose a source", [
-      {
-        text: "Take Photo",
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) return;
-          const res = await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.9,
-          });
-          if (!res.canceled && res.assets?.[0]?.uri) setter(res.assets[0].uri);
-        },
-      },
-      {
-        text: "Choose from Library",
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) return;
-          const res = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.9,
-          });
-          if (!res.canceled && res.assets?.[0]?.uri) setter(res.assets[0].uri);
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+  const changeAvatar = async () => {
+    try {
+      const userId = await getUserId();
+      const choice = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.9,
+      });
+      if (choice.canceled || !choice.assets?.[0]?.uri) return;
+      await uploadAvatar(choice.assets[0].uri, userId, isOrg);
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Unable to change photo.");
+    }
+  };
+
+  // FIX: use arrayBuffer rather than blob for React Native
+  const uploadAvatar = async (
+    uri: string,
+    userId: string,
+    isOrgMode: boolean
+  ) => {
+    try {
+      setUploadingAvatar(true);
+      const res = await fetch(uri);
+      const arrayBuffer = await res.arrayBuffer();
+      const fileBytes = new Uint8Array(arrayBuffer);
+      const mime = (res.headers.get("Content-Type") as string) || "image/jpeg";
+      const ext = extFromUriOrMime(uri, mime);
+      const path = `profiles/${userId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, fileBytes, { contentType: mime, upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+
+      if (isOrgMode) {
+        const { error } = await supabase
+          .from("Org_info")
+          .update({ image_url: publicUrl })
+          .eq("User_id", userId);
+        if (error) throw error;
+        setOLogo(publicUrl);
+      } else {
+        const { error } = await supabase
+          .from("val_info_")
+          .update({ image_url: publicUrl })
+          .eq("User_id", userId);
+        if (error) throw error;
+        setVPhoto(publicUrl);
+      }
+
+      Alert.alert("Photo updated", "Your profile photo was updated.");
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message ?? "Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const toggleInterest = (key: AreaKey) =>
@@ -154,7 +204,6 @@ export default function ProfilePage() {
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
 
-  // Load profile
   useEffect(() => {
     let active = true;
     (async () => {
@@ -181,7 +230,6 @@ export default function ProfilePage() {
               .map(([k]) => k as AreaKey)
           );
         } else {
-          // FIX: table name is val_info_
           const { data: vol, error } = await supabase
             .from("val_info_")
             .select(
@@ -339,17 +387,36 @@ export default function ProfilePage() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <CenteredAvatar
-          uri={isOrg ? oLogo : vPhoto}
-          fallbackText={
-            isOrg ? "ORG" : `${firstName[0] || ""}${lastName[0] || ""}`
-          }
-          onPick={() =>
-            isOrg
-              ? pickImage((u) => setOLogo(u))
-              : pickImage((u) => setVPhoto(u))
-          }
-        />
+        <View style={styles.avatarRow}>
+          <TouchableOpacity
+            onPress={changeAvatar}
+            style={styles.avatarContainer}
+            activeOpacity={0.85}
+          >
+            {isOrg ? (
+              oLogo ? (
+                <Image source={{ uri: oLogo }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarPlaceholderText}>ORG</Text>
+                </View>
+              )
+            ) : vPhoto ? (
+              <Image source={{ uri: vPhoto }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarPlaceholderText}>
+                  {`${firstName[0] || ""}${lastName[0] || ""}` || "?"}
+                </Text>
+              </View>
+            )}
+            <View style={styles.editIconBadge}>
+              <Text style={styles.editIconText}>
+                {uploadingAvatar ? "…" : "✎"}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
         {isOrg ? (
           <View style={styles.formSection}>
             <Field label="Organization Name">
@@ -406,11 +473,17 @@ export default function ProfilePage() {
         <Field label={isOrg ? "Interests / Focus Areas" : "Interests"}>
           <View style={styles.chipGrid}>
             {AREAS.map((area) => {
-              const selected = interests.includes(area.key);
+              const selected = interests.includes(area.key as AreaKey);
               return (
                 <TouchableOpacity
                   key={area.key}
-                  onPress={() => toggleInterest(area.key)}
+                  onPress={() =>
+                    setInterests((prev) =>
+                      selected
+                        ? prev.filter((k) => k !== area.key)
+                        : [...prev, area.key as AreaKey]
+                    )
+                  }
                   style={[
                     styles.chip,
                     selected && {
@@ -445,7 +518,7 @@ export default function ProfilePage() {
           activeOpacity={0.9}
           onPress={handleSave}
           style={styles.saveBtn}
-          disabled={saving}
+          disabled={saving || uploadingAvatar}
         >
           <Text style={styles.saveText}>
             {saving ? "Saving..." : "Save Changes"}
@@ -465,39 +538,6 @@ export default function ProfilePage() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
-    </View>
-  );
-}
-
-function CenteredAvatar({
-  uri,
-  fallbackText,
-  onPick,
-}: {
-  uri: string | null;
-  fallbackText: string;
-  onPick: () => void;
-}) {
-  return (
-    <View style={styles.avatarRow}>
-      <TouchableOpacity
-        onPress={onPick}
-        style={styles.avatarContainer}
-        activeOpacity={0.85}
-      >
-        {uri ? (
-          <Image source={{ uri }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarPlaceholderText}>
-              {fallbackText || "?"}
-            </Text>
-          </View>
-        )}
-        <View style={styles.editIconBadge}>
-          <Text style={styles.editIconText}>✎</Text>
-        </View>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -550,7 +590,6 @@ const styles = StyleSheet.create({
     borderColor: BG,
   },
   editIconText: { color: "#FFF", fontSize: 16, marginBottom: 2 },
-
   fieldGroup: { gap: 8 },
   label: { fontSize: 14, fontWeight: "600", color: TEXT_SECONDARY },
   input: {
@@ -564,7 +603,6 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY,
   },
   textArea: { minHeight: 100, textAlignVertical: "top", lineHeight: 22 },
-
   chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -579,7 +617,6 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   chipLabel: { fontSize: 14, color: TEXT_SECONDARY, fontWeight: "500" },
-
   saveBtn: {
     backgroundColor: ACCENT,
     borderRadius: 14,
