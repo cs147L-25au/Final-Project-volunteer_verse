@@ -1,5 +1,5 @@
-// THIRD PAGE OF SIGNUP, user enters their name, date of birth, and takes or chooses picture.
-// Continues to accountinfo.tsx
+// STEP 4 (Volunteer): Personal Details & Photo
+// Navigates to: Volunteer Dashboard (/homepage)
 import React, { useState } from "react";
 import {
   View,
@@ -91,16 +91,13 @@ export default function UserInfo() {
 
   const handleNext = () => {
     if (!canContinue) return;
-    router.push("/accountinfo");
+    // FINISH: Go to Volunteer Dashboard
+    // In a real app, you would create the user in Supabase here.
+    router.replace("/homepage");
   };
 
   const goBack = () => {
-    console.log("Back button pressed");
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/newvolunteer");
-    }
+    router.back();
   };
 
   return (
@@ -147,7 +144,7 @@ export default function UserInfo() {
             </Text>
           </TouchableOpacity>
 
-          {/* Android picker (system modal) */}
+          {/* Android picker */}
           {showPicker && Platform.OS === "android" && (
             <DateTimePicker
               value={dob || new Date(2000, 0, 1)}
@@ -158,7 +155,7 @@ export default function UserInfo() {
             />
           )}
 
-          {/* iOS picker in a modal bottom sheet with Close/Done */}
+          {/* iOS picker */}
           <Modal
             visible={showPicker && Platform.OS === "ios"}
             transparent
@@ -225,7 +222,6 @@ export default function UserInfo() {
           </Text>
         )}
 
-        {/* Spacer so content can scroll under the fixed Next button */}
         <View style={{ height: 100 }} />
       </ScrollView>
 

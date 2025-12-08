@@ -1,4 +1,5 @@
-// SECOND PAGE OF SIGNUP, user selects the areas they are interested in impacting.
+// STEP 3 (Volunteer): Select Interests
+// Navigates to: User Info (Personal Details)
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
@@ -12,12 +13,12 @@ type AreaKey =
   | "marginalized";
 
 const AREAS: { key: AreaKey; label: string; color: string }[] = [
-  { key: "environment", label: "Environment", color: "#22C55E" }, // eco-green
-  { key: "education", label: "Education", color: "#F59E0B" }, // pencil-yellow
-  { key: "health", label: "Health", color: "#EF4444" }, // red
-  { key: "animals", label: "Animals", color: "#0D9488" }, // jungle green
-  { key: "community", label: "Community Outreach", color: "#8B5CF6" }, // purple
-  { key: "marginalized", label: "Marginalized Groups", color: "#F472B6" }, // pink
+  { key: "environment", label: "Environment", color: "#22C55E" },
+  { key: "education", label: "Education", color: "#F59E0B" },
+  { key: "health", label: "Health", color: "#EF4444" },
+  { key: "animals", label: "Animals", color: "#0D9488" },
+  { key: "community", label: "Community Outreach", color: "#8B5CF6" },
+  { key: "marginalized", label: "Marginalized Groups", color: "#F472B6" },
 ];
 
 const ACCENT = "#5865F2";
@@ -26,13 +27,12 @@ const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
 
-// helper: convert hex to rgba with alpha
 function hexToRgba(hex: string, alpha = 0.14) {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
-  return "rgba(${r}, ${g}, ${b}, ${alpha})";
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export default function NewVolunteer() {
@@ -58,11 +58,7 @@ export default function NewVolunteer() {
   };
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/userinfo");
-    }
+    router.back();
   };
 
   return (
@@ -195,12 +191,10 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     minWidth: "44%",
     gap: 8,
-    // shadow for iOS
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
-    // elevation for Android
     elevation: 1,
   },
   dot: {

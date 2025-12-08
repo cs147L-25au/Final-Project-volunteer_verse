@@ -1,5 +1,5 @@
-// First page of organization signup flow.
-// User enters organization details and then continues to accountinfo
+// STEP 3 (Organization): Org Details
+// Navigates to: Org Dashboard (/orgdashboard)
 import React, { useState } from "react";
 import {
   View,
@@ -28,15 +28,12 @@ export default function NewOrganization() {
 
   const handleNext = () => {
     if (!canContinue) return;
-    router.push("/accountinfo");
+    // FINISH: Org signup complete, go to Dashboard
+    router.replace("/orgdashboard");
   };
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/signup");
-    }
+    router.back();
   };
 
   return (

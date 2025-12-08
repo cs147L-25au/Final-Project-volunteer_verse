@@ -1,5 +1,5 @@
-// (4th) Final page of organization OR volunteer signup flow.
-// Enter username and password and continue to login screen.
+// STEP 2: Email & Password
+// Navigates to: New Volunteer OR New Organization (based on role param)
 import React, { useState } from "react";
 import {
   View,
@@ -9,7 +9,7 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -19,26 +19,30 @@ const BORDER = "#E5E7EB";
 
 export default function AccountInfo() {
   const router = useRouter();
+  // Get the role passed from usertype.tsx
+  const { role } = useLocalSearchParams<{ role: string }>();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
   const showConfirm = password.length > 0;
   const passwordsMatch = confirm.length > 0 && password === confirm;
-  const canContinue = Boolean(username.trim() && password && passwordsMatch);
+  const canContinue = Boolean(email.trim() && password && passwordsMatch);
 
   const handleNext = () => {
     if (!canContinue) return;
-    router.replace("/(user-flow)"); // login screen
+
+    // Route based on role passed from previous screen
+    if (role === "volunteer") {
+      router.push("/newvolunteer");
+    } else {
+      router.push("/neworganization");
+    }
   };
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/userinfo");
-    }
+    router.back();
   };
 
   return (
@@ -55,15 +59,16 @@ export default function AccountInfo() {
         >
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Let's create your account</Text>
+        <Text style={styles.title}>Create your account</Text>
         <View style={styles.fieldGroup}>
           <TextInput
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Username"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email address"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="email-address"
             style={styles.input}
           />
 
@@ -119,45 +124,6 @@ export default function AccountInfo() {
     </View>
   );
 }
-
-/* Supabase username check (commented until DB is set up)
-
-import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL!, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!);
-
-const [usernameStatus, setUsernameStatus] = useState<'available' | 'taken' | 'checking' | null>(null);
-
-useEffect(() => {
-let active = true;
-const check = async () => {
-const u = username.trim();
-if (!u) return setUsernameStatus(null);
-setUsernameStatus('checking');
-const { data, error } = await supabase
-.from('profiles')           // adjust table and column
-.select('username')
-.eq('username', u)
-.maybeSingle();
-if (!active) return;
-if (error) {
-  setUsernameStatus(null); // optionally handle error
-  return;
-}
-setUsernameStatus(data ? 'taken' : 'available');
-};
-
-const t = setTimeout(check, 350); // debounce
-return () => {
-active = false;
-clearTimeout(t);
-};
-}, [username]);
-
-// UI next to the username input:
-// {usernameStatus === 'taken' && <Text style={styles.statusTaken}>This username is already taken, please try something else</Text>}
-// {usernameStatus === 'available' && <Text style={styles.statusOk}>This username is available</Text>}
-
-*/
 
 const styles = StyleSheet.create({
   container: {
@@ -229,15 +195,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.3,
-  },
-  statusTaken: {
-    fontSize: 12,
-    color: "#DC2626",
-    marginTop: 6,
-  },
-  statusOk: {
-    fontSize: 12,
-    color: "#16A34A",
-    marginTop: 6,
   },
 });
