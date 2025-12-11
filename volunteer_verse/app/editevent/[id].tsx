@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
   Modal,
   Alert,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { supabase } from "utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -20,75 +20,30 @@ const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
 
-// Duplicate mock data for lookup
-const MOCK_EVENTS: Record<
-  string,
-  {
-    id: string;
-    name: string;
-    description: string;
-    location: string;
-    startISO: string;
-    endISO: string;
-  }
-> = {
-  "e-101": {
-    id: "e-101",
-    name: "Community Health Screening",
-    description:
-      "Provide basic health screenings and wellness guidance to local residents.",
-    location: "Downtown Community Clinic",
-    startISO: "2025-01-25T09:00:00",
-    endISO: "2025-01-25T12:00:00",
-  },
-  "e-102": {
-    id: "e-102",
-    name: "Fundraising Gala",
-    description: "Annual gala to raise funds for our outreach programs.",
-    location: "City Hall Ballroom",
-    startISO: "2025-02-10T18:00:00",
-    endISO: "2025-02-10T21:00:00",
-  },
-  "e-103": {
-    id: "e-103",
-    name: "Park Cleanup",
-    description: "Join us to keep our parks clean and welcoming.",
-    location: "Liberty Park",
-    startISO: "2025-02-18T10:00:00",
-    endISO: "2025-02-18T13:00:00",
-  },
+type EventRow = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  location: string | null;
+  start_at: string; // ISO
+  end_at: string; // ISO
 };
 
 export default function EditEvent() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
 
-  const event = MOCK_EVENTS[id!];
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+
   const [date, setDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState<Date>(new Date());
   const [endTime, setEndTime] = useState<Date>(new Date());
-  const [description, setDescription] = useState("");
 
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    if (event) {
-      const s = new Date(event.startISO);
-      const e = new Date(event.endISO);
-      setName(event.name);
-      setLocation(event.location);
-      setDescription(event.description);
-      setDate(s);
-      setStartTime(s);
-      setEndTime(e);
-      setIsLoaded(true);
-    }
-  }, [event]);
-
+  // iOS modal pickers
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
@@ -97,80 +52,125 @@ export default function EditEvent() {
   const [tempStart, setTempStart] = useState<Date>(new Date());
   const [tempEnd, setTempEnd] = useState<Date>(new Date());
 
-  const endAfterStart = useMemo(
-    () => endTime > startTime,
-    [startTime, endTime]
-  );
-  const allFilled = name.trim() && location.trim() && description.trim();
-  const canSave = Boolean(allFilled && endAfterStart);
+  const endAfterStart = useMemo(() => {
+    const s = withDate(startTime, date);
+    const e = withDate(endTime, date);
+    return e > s;
+  }, [startTime, endTime, date]);
 
-  // helpers
-  const withDate = (baseTime: Date, newDate: Date) => {
-    const d = new Date(baseTime);
-    d.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
-    return d;
-  };
-  const fmtDate = (d: Date) =>
-    d.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  const fmtTime = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const canSave = Boolean(name.trim() && location.trim() && endAfterStart);
 
-  const openDatePicker = () => {
-    setTempDate(date);
-    setShowDatePicker(true);
-  };
-  const openStartPicker = () => {
-    setTempStart(startTime);
-    setShowStartPicker(true);
-  };
-  const openEndPicker = () => {
-    setTempEnd(endTime);
-    setShowEndPicker(true);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("events")
+          .select("id,name,description,location,start_at,end_at")
+          .eq("id", String(id))
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          Alert.alert("Not found", "Event could not be found.");
+          return;
+        }
+        if (!active) return;
+        const start = new Date(data.start_at);
+        const end = new Date(data.end_at);
+
+        setName(data.name ?? "");
+        setLocation(data.location ?? "");
+        setDescription(data.description ?? "");
+        setDate(new Date(start));
+        setStartTime(new Date(start));
+        setEndTime(new Date(end));
+
+        setTempDate(new Date(start));
+        setTempStart(new Date(start));
+        setTempEnd(new Date(end));
+      } catch (e: any) {
+        Alert.alert("Error", e.message ?? "Failed to load event");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const handleSave = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const start_at = withDate(startTime, date).toISOString();
+      const end_at = withDate(endTime, date).toISOString();
+      const { error } = await supabase
+        .from("events")
+        .update({
+          name: name.trim(),
+          description: description.trim() || null,
+          location: location.trim(),
+          start_at,
+          end_at,
+        })
+        .eq("id", String(id));
+
+      if (error) throw error;
+
+      Alert.alert("Saved", "Your event has been updated.");
+    } catch (e: any) {
+      Alert.alert("Save failed", e.message ?? "Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSave = () => {
-    if (!canSave) return;
-    Alert.alert("Success", "Event updated successfully", [
-      { text: "OK", onPress: () => router.back() },
-    ]);
+  // Android picker handlers
+  const onAndroidDateChange = (_e: any, selected?: Date) => {
+    setShowDatePicker(false);
+    if (selected) {
+      setDate(selected);
+      setStartTime((prev) => withDate(prev, selected));
+      setEndTime((prev) => withDate(prev, selected));
+    }
+  };
+  const onAndroidStartChange = (_e: any, selected?: Date) => {
+    setShowStartPicker(false);
+    if (selected) setStartTime(withDate(selected, date));
+  };
+  const onAndroidEndChange = (_e: any, selected?: Date) => {
+    setShowEndPicker(false);
+    if (selected) setEndTime(withDate(selected, date));
   };
 
-  if (!id || !event) {
+  if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.errorText}>Event not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Go Back</Text>
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <Text style={{ color: TEXT_SECONDARY }}>Loading event…</Text>
       </View>
     );
   }
 
-  if (!isLoaded) return <View style={styles.container} />;
+  const dateLabel = fmtDate(date);
+  const startLabel = fmtTime(startTime);
+  const endLabel = fmtTime(endTime);
 
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + 20 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButtonHeader}
-        >
-          <Text style={styles.backText}>Cancel</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Edit Event</Text>
-        <View style={styles.group}>
+        <Text style={styles.title}>Edit event</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Event name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -178,6 +178,8 @@ export default function EditEvent() {
             placeholderTextColor="#9CA3AF"
             style={styles.input}
           />
+
+          <Text style={styles.label}>Location</Text>
           <TextInput
             value={location}
             onChangeText={setLocation}
@@ -186,30 +188,23 @@ export default function EditEvent() {
             style={styles.input}
           />
 
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>Date</Text>
-          </View>
+          <Text style={styles.label}>Date</Text>
           <TouchableOpacity
             style={styles.inputPressable}
             activeOpacity={0.8}
-            onPress={openDatePicker}
+            onPress={() => {
+              setTempDate(date);
+              setShowDatePicker(true);
+            }}
           >
-            <Text style={styles.inputText}>{fmtDate(date)}</Text>
+            <Text style={styles.inputText}>{dateLabel}</Text>
           </TouchableOpacity>
-
           {showDatePicker && Platform.OS === "android" && (
             <DateTimePicker
               value={date}
               mode="date"
               display="default"
-              onChange={(_e, selected) => {
-                setShowDatePicker(false);
-                if (selected) {
-                  setDate(selected);
-                  setStartTime((prev) => withDate(prev, selected));
-                  setEndTime((prev) => withDate(prev, selected));
-                }
-              }}
+              onChange={onAndroidDateChange}
             />
           )}
 
@@ -219,19 +214,19 @@ export default function EditEvent() {
               <TouchableOpacity
                 style={styles.inputPressable}
                 activeOpacity={0.8}
-                onPress={openStartPicker}
+                onPress={() => {
+                  setTempStart(startTime);
+                  setShowStartPicker(true);
+                }}
               >
-                <Text style={styles.inputText}>{fmtTime(startTime)}</Text>
+                <Text style={styles.inputText}>{startLabel}</Text>
               </TouchableOpacity>
               {showStartPicker && Platform.OS === "android" && (
                 <DateTimePicker
                   value={startTime}
                   mode="time"
                   display="default"
-                  onChange={(_e, selected) => {
-                    setShowStartPicker(false);
-                    if (selected) setStartTime(withDate(selected, date));
-                  }}
+                  onChange={onAndroidStartChange}
                 />
               )}
             </View>
@@ -241,55 +236,60 @@ export default function EditEvent() {
               <TouchableOpacity
                 style={styles.inputPressable}
                 activeOpacity={0.8}
-                onPress={openEndPicker}
+                onPress={() => {
+                  setTempEnd(endTime);
+                  setShowEndPicker(true);
+                }}
               >
-                <Text style={styles.inputText}>{fmtTime(endTime)}</Text>
+                <Text style={styles.inputText}>{endLabel}</Text>
               </TouchableOpacity>
               {showEndPicker && Platform.OS === "android" && (
                 <DateTimePicker
                   value={endTime}
                   mode="time"
                   display="default"
-                  onChange={(_e, selected) => {
-                    setShowEndPicker(false);
-                    if (selected) setEndTime(withDate(selected, date));
-                  }}
+                  onChange={onAndroidEndChange}
                 />
               )}
             </View>
           </View>
 
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>Description</Text>
-          </View>
+          {!endAfterStart && (
+            <Text style={styles.hint}>End time must be after start time</Text>
+          )}
+
+          <Text style={styles.label}>Description</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Briefly describe the event"
+            placeholder="Add a brief description"
             placeholderTextColor="#9CA3AF"
-            style={[styles.input, styles.textarea]}
             multiline
+            style={[styles.input, styles.textarea]}
           />
-
-          {!endAfterStart && (
-            <Text style={styles.error}>End time must be after start time</Text>
-          )}
         </View>
+
+        {!canSave && (
+          <Text style={[styles.hint, { marginTop: 8 }]}>
+            Fill name, location, and ensure end time is after start time
+          </Text>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {canSave && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={handleSave}
-          style={styles.saveBtn}
-        >
-          <Text style={styles.saveText}>Save Changes</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={handleSave}
+        disabled={!canSave || saving}
+        style={[styles.saveBtn, (!canSave || saving) && { opacity: 0.7 }]}
+      >
+        <Text style={styles.saveText}>
+          {saving ? "Saving..." : "Save changes"}
+        </Text>
+      </TouchableOpacity>
 
-      {/* iOS Pickers */}
+      {/* iOS modal pickers */}
       <Modal
         visible={showDatePicker && Platform.OS === "ios"}
         transparent
@@ -320,10 +320,10 @@ export default function EditEvent() {
               value={tempDate}
               mode="date"
               display="spinner"
-              onChange={(_, selected) => selected && setTempDate(selected)}
+              onChange={(_, selected?: Date) =>
+                selected && setTempDate(selected)
+              }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -357,10 +357,10 @@ export default function EditEvent() {
               value={tempStart}
               mode="time"
               display="spinner"
-              onChange={(_, selected) => selected && setTempStart(selected)}
+              onChange={(_, selected?: Date) =>
+                selected && setTempStart(selected)
+              }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -394,10 +394,10 @@ export default function EditEvent() {
               value={tempEnd}
               mode="time"
               display="spinner"
-              onChange={(_, selected) => selected && setTempEnd(selected)}
+              onChange={(_, selected?: Date) =>
+                selected && setTempEnd(selected)
+              }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -406,19 +406,57 @@ export default function EditEvent() {
   );
 }
 
+// helpers
+function withDate(time: Date, date: Date) {
+  const d = new Date(time);
+  d.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+  return d;
+}
+function fmtDate(d: Date) {
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  center: { alignItems: "center", justifyContent: "center" },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
-  backButtonHeader: { alignSelf: "flex-start", marginBottom: 12 },
-  backText: { color: ACCENT, fontSize: 16, fontWeight: "600" },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
   title: {
     fontSize: 24,
     fontWeight: "700",
     color: TEXT_PRIMARY,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  group: { gap: 12 },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+
+  label: {
+    fontSize: 14,
+    color: TEXT_SECONDARY,
+    fontWeight: "700",
+    marginBottom: 6,
+    marginTop: 10,
+  },
   input: {
     backgroundColor: "#FFFFFF",
     borderColor: BORDER,
@@ -428,23 +466,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
     color: TEXT_PRIMARY,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
-  },
-  textarea: {
-    minHeight: 120,
-    textAlignVertical: "top",
-    lineHeight: 20,
-  },
-  labelRow: { marginTop: 6 },
-  label: {
-    fontSize: 14,
-    color: TEXT_SECONDARY,
-    fontWeight: "600",
-    marginBottom: 6,
   },
   inputPressable: {
     backgroundColor: "#FFFFFF",
@@ -453,15 +474,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
   },
   inputText: { fontSize: 16, color: TEXT_PRIMARY },
-  timeRow: { flexDirection: "row", alignItems: "flex-start" },
-  error: { fontSize: 12, color: "#DC2626", marginTop: 6 },
+
+  timeRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 10 },
+
+  textarea: { minHeight: 110, textAlignVertical: "top", marginTop: 6 },
+
+  hint: { fontSize: 12, color: "#DC2626", marginTop: 8 },
+
   saveBtn: {
     position: "absolute",
     left: 20,
@@ -484,9 +505,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.3,
   },
-  errorText: { fontSize: 18, color: TEXT_SECONDARY, marginBottom: 12 },
-  backBtn: { padding: 10 },
-  backBtnText: { color: ACCENT, fontWeight: "700" },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(15,23,42,0.25)",

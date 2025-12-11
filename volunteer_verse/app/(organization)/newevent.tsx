@@ -161,16 +161,6 @@ export default function NewEvent() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backText}>Back to feed</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Create a new event</Text>
         <View style={styles.group}>
           <TextInput
             value={name}
@@ -425,7 +415,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingVertical: 8,
     paddingHorizontal: 10,
-    paddingTop:20 
+    paddingTop: 20,
   },
   backText: {
     color: ACCENT,

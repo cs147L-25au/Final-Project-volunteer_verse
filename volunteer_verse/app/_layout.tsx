@@ -59,7 +59,7 @@ export default function RootLayout() {
       <Stack.Screen
         name="(organization)"
         options={{
-          headerShown: true,
+          headerShown: false,
           headerTitle: "",
           headerTransparent: true,
           headerTintColor: "#1F2937",
