@@ -26,7 +26,6 @@ export default function RootLayout() {
             Platform.OS === "ios" ? "systemMaterial" : undefined,
         }}
       />
-
       {/* Signup flow: root header shown */}
       <Stack.Screen
         name="(signup)"
@@ -40,7 +39,6 @@ export default function RootLayout() {
             Platform.OS === "ios" ? "systemMaterial" : undefined,
         }}
       />
-
       {/* Volunteer group: root header shown */}
       <Stack.Screen
         name="(volunteer)"
@@ -54,7 +52,6 @@ export default function RootLayout() {
             Platform.OS === "ios" ? "systemMaterial" : undefined,
         }}
       />
-
       {/* Organization group: root header shown */}
       <Stack.Screen
         name="(organization)"
@@ -68,7 +65,7 @@ export default function RootLayout() {
             Platform.OS === "ios" ? "systemMaterial" : undefined,
         }}
       />
-      {/* Edit event stack */}
+      Edit event stack
       <Stack.Screen
         name="editevent"
         options={{
@@ -78,7 +75,6 @@ export default function RootLayout() {
           headerTintColor: "#1F2937",
         }}
       />
-
       {/* Profile stack */}
       <Stack.Screen
         name="profile"
