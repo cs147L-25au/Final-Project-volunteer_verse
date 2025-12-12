@@ -11,6 +11,7 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "utils/supabase";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type EventItem = {
   id: string;
@@ -29,6 +30,7 @@ const BORDER = "#E5E7EB";
 
 export default function OrgDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,8 +124,20 @@ export default function OrgDashboard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Header with Title and Actions */}
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <Text style={styles.headerTitle}>Your Events</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() =>
+              router.push({ pathname: "/profile", params: { type: "org" } })
+            }
+            activeOpacity={0.8}
+          >
+            <Text style={styles.iconText}>👤</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {loading ? (
         <View
@@ -253,14 +267,39 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 12,
     backgroundColor: BG,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
     color: TEXT_PRIMARY,
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  iconText: {
+    fontSize: 18,
   },
   listContent: {
     paddingHorizontal: 20,

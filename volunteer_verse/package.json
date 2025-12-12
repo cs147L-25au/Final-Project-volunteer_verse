@@ -17,6 +17,7 @@
     "expo-image-picker": "~17.0.8",
     "expo-linking": "~8.0.9",
     "expo-router": "~6.0.15",
+    "expo-splash-screen": "~31.0.12",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",

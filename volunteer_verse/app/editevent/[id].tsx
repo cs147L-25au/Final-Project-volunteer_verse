@@ -1,5 +1,4 @@
-import { supabase } from "utils/supabase";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,8 +10,9 @@ import {
   Modal,
   Alert,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { supabase } from "utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -20,68 +20,114 @@ const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
 
-export default function NewEvent() {
-  const router = useRouter();
+type EventRow = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  location: string | null;
+  start_at: string; // ISO
+  end_at: string; // ISO
+};
 
-  const now = new Date();
-  const defaultStart = new Date(now);
-  defaultStart.setMinutes(0, 0, 0);
-  defaultStart.setHours(now.getHours() + 1);
-  const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+export default function EditEvent() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  const [date, setDate] = useState<Date>(new Date());
-  const [startTime, setStartTime] = useState<Date>(defaultStart);
-  const [endTime, setEndTime] = useState<Date>(defaultEnd);
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
 
+  const [date, setDate] = useState<Date>(new Date());
+  const [startTime, setStartTime] = useState<Date>(new Date());
+  const [endTime, setEndTime] = useState<Date>(new Date());
+
+  // iOS modal pickers
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
-  const [tempDate, setTempDate] = useState<Date>(date);
-  const [tempStart, setTempStart] = useState<Date>(startTime);
-  const [tempEnd, setTempEnd] = useState<Date>(endTime);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+  const [tempStart, setTempStart] = useState<Date>(new Date());
+  const [tempEnd, setTempEnd] = useState<Date>(new Date());
 
-  const endAfterStart = useMemo(
-    () => endTime > startTime,
-    [startTime, endTime]
-  );
-  const allFilled = name.trim() && location.trim() && description.trim();
-  const canCreate = Boolean(allFilled && endAfterStart);
+  const endAfterStart = useMemo(() => {
+    const s = withDate(startTime, date);
+    const e = withDate(endTime, date);
+    return e > s;
+  }, [startTime, endTime, date]);
 
-  // helpers
-  const withDate = (baseTime: Date, newDate: Date) => {
-    const d = new Date(baseTime);
-    d.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
-    return d;
-  };
-  const fmtDate = (d: Date) =>
-    d.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  const fmtTime = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const canSave = Boolean(name.trim() && location.trim() && endAfterStart);
 
-  const openDatePicker = () => {
-    setTempDate(date);
-    setShowDatePicker(true);
-  };
-  const openStartPicker = () => {
-    setTempStart(startTime);
-    setShowStartPicker(true);
-  };
-  const openEndPicker = () => {
-    setTempEnd(endTime);
-    setShowEndPicker(true);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("events")
+          .select("id,name,description,location,start_at,end_at")
+          .eq("id", String(id))
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          Alert.alert("Not found", "Event could not be found.");
+          return;
+        }
+        if (!active) return;
+        const start = new Date(data.start_at);
+        const end = new Date(data.end_at);
+
+        setName(data.name ?? "");
+        setLocation(data.location ?? "");
+        setDescription(data.description ?? "");
+        setDate(new Date(start));
+        setStartTime(new Date(start));
+        setEndTime(new Date(end));
+
+        setTempDate(new Date(start));
+        setTempStart(new Date(start));
+        setTempEnd(new Date(end));
+      } catch (e: any) {
+        Alert.alert("Error", e.message ?? "Failed to load event");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const handleSave = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const start_at = withDate(startTime, date).toISOString();
+      const end_at = withDate(endTime, date).toISOString();
+      const { error } = await supabase
+        .from("events")
+        .update({
+          name: name.trim(),
+          description: description.trim() || null,
+          location: location.trim(),
+          start_at,
+          end_at,
+        })
+        .eq("id", String(id));
+
+      if (error) throw error;
+
+      Alert.alert("Saved", "Your event has been updated.");
+    } catch (e: any) {
+      Alert.alert("Save failed", e.message ?? "Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Android handlers (system dialog)
+  // Android picker handlers
   const onAndroidDateChange = (_e: any, selected?: Date) => {
     setShowDatePicker(false);
     if (selected) {
@@ -92,60 +138,29 @@ export default function NewEvent() {
   };
   const onAndroidStartChange = (_e: any, selected?: Date) => {
     setShowStartPicker(false);
-    if (selected) {
-      const merged = withDate(selected, date);
-      setStartTime(merged);
-    }
+    if (selected) setStartTime(withDate(selected, date));
   };
   const onAndroidEndChange = (_e: any, selected?: Date) => {
     setShowEndPicker(false);
-    if (selected) {
-      const merged = withDate(selected, date);
-      setEndTime(merged);
-    }
+    if (selected) setEndTime(withDate(selected, date));
   };
 
-  const handleCreate = async () => {
-    if (!canCreate || saving) return;
-    setSaving(true);
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth.user?.id;
-      if (!userId) throw new Error("Not signed in");
-      // Get the org the current user owns/admins (adjust if you support multiple orgs)
-      const { data: org, error: orgErr } = await supabase
-        .from("Org_info")
-        .select("id")
-        .eq("User_id", userId)
-        .maybeSingle();
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <Text style={{ color: TEXT_SECONDARY }}>Loading event…</Text>
+      </View>
+    );
+  }
 
-      if (orgErr) throw orgErr;
-      if (!org?.id) throw new Error("No organization found for this user");
-
-      const { error: insertErr } = await supabase.from("events").insert({
-        org_id: org.id, // bigint FK to Org_info.id
-        name,
-        description,
-        location,
-        start_at: startTime.toISOString(), // timestamptz
-        end_at: endTime.toISOString(), // timestamptz
-      });
-
-      if (insertErr) throw insertErr;
-
-      Alert.alert(
-        "Event created",
-        `“${name}” on ${fmtDate(date)} from ${fmtTime(startTime)} to ${fmtTime(
-          endTime
-        )} has been created.`
-      );
-      router.replace("/orgdashboard");
-    } catch (e: any) {
-      Alert.alert("Error creating event", e.message ?? "Unknown error");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const dateLabel = fmtDate(date);
+  const startLabel = fmtTime(startTime);
+  const endLabel = fmtTime(endTime);
 
   return (
     <View style={styles.container}>
@@ -153,8 +168,9 @@ export default function NewEvent() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Create a new event</Text>
-        <View style={styles.group}>
+        <Text style={styles.title}>Edit event</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Event name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -162,6 +178,8 @@ export default function NewEvent() {
             placeholderTextColor="#9CA3AF"
             style={styles.input}
           />
+
+          <Text style={styles.label}>Location</Text>
           <TextInput
             value={location}
             onChangeText={setLocation}
@@ -170,24 +188,22 @@ export default function NewEvent() {
             style={styles.input}
           />
 
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>Date</Text>
-          </View>
+          <Text style={styles.label}>Date</Text>
           <TouchableOpacity
             style={styles.inputPressable}
             activeOpacity={0.8}
-            onPress={openDatePicker}
+            onPress={() => {
+              setTempDate(date);
+              setShowDatePicker(true);
+            }}
           >
-            <Text style={styles.inputText}>{fmtDate(date)}</Text>
+            <Text style={styles.inputText}>{dateLabel}</Text>
           </TouchableOpacity>
-
-          {/* Android date picker */}
           {showDatePicker && Platform.OS === "android" && (
             <DateTimePicker
               value={date}
               mode="date"
               display="default"
-              minimumDate={new Date()}
               onChange={onAndroidDateChange}
             />
           )}
@@ -198,9 +214,12 @@ export default function NewEvent() {
               <TouchableOpacity
                 style={styles.inputPressable}
                 activeOpacity={0.8}
-                onPress={openStartPicker}
+                onPress={() => {
+                  setTempStart(startTime);
+                  setShowStartPicker(true);
+                }}
               >
-                <Text style={styles.inputText}>{fmtTime(startTime)}</Text>
+                <Text style={styles.inputText}>{startLabel}</Text>
               </TouchableOpacity>
               {showStartPicker && Platform.OS === "android" && (
                 <DateTimePicker
@@ -217,9 +236,12 @@ export default function NewEvent() {
               <TouchableOpacity
                 style={styles.inputPressable}
                 activeOpacity={0.8}
-                onPress={openEndPicker}
+                onPress={() => {
+                  setTempEnd(endTime);
+                  setShowEndPicker(true);
+                }}
               >
-                <Text style={styles.inputText}>{fmtTime(endTime)}</Text>
+                <Text style={styles.inputText}>{endLabel}</Text>
               </TouchableOpacity>
               {showEndPicker && Platform.OS === "android" && (
                 <DateTimePicker
@@ -232,45 +254,42 @@ export default function NewEvent() {
             </View>
           </View>
 
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>Description</Text>
-          </View>
+          {!endAfterStart && (
+            <Text style={styles.hint}>End time must be after start time</Text>
+          )}
+
+          <Text style={styles.label}>Description</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Briefly describe the event"
+            placeholder="Add a brief description"
             placeholderTextColor="#9CA3AF"
-            style={[styles.input, styles.textarea]}
             multiline
+            style={[styles.input, styles.textarea]}
           />
-
-          {!endAfterStart && (
-            <Text style={styles.error}>End time must be after start time</Text>
-          )}
-          {!canCreate && (
-            <Text style={styles.hint}>
-              Please complete all fields to create the event
-            </Text>
-          )}
         </View>
+
+        {!canSave && (
+          <Text style={[styles.hint, { marginTop: 8 }]}>
+            Fill name, location, and ensure end time is after start time
+          </Text>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {canCreate && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={handleCreate}
-          style={styles.createBtn}
-          disabled={saving}
-        >
-          <Text style={styles.createText}>
-            {saving ? "Creating..." : "Create Event"}
-          </Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={handleSave}
+        disabled={!canSave || saving}
+        style={[styles.saveBtn, (!canSave || saving) && { opacity: 0.7 }]}
+      >
+        <Text style={styles.saveText}>
+          {saving ? "Saving..." : "Save changes"}
+        </Text>
+      </TouchableOpacity>
 
-      {/* iOS bottom-sheet pickers */}
+      {/* iOS modal pickers */}
       <Modal
         visible={showDatePicker && Platform.OS === "ios"}
         transparent
@@ -301,13 +320,10 @@ export default function NewEvent() {
               value={tempDate}
               mode="date"
               display="spinner"
-              minimumDate={new Date()}
               onChange={(_, selected?: Date) =>
                 selected && setTempDate(selected)
               }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -345,8 +361,6 @@ export default function NewEvent() {
                 selected && setTempStart(selected)
               }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -384,8 +398,6 @@ export default function NewEvent() {
                 selected && setTempEnd(selected)
               }
               themeVariant="light"
-              textColor={TEXT_PRIMARY}
-              accentColor={ACCENT}
             />
           </View>
         </View>
@@ -394,16 +406,57 @@ export default function NewEvent() {
   );
 }
 
+// helpers
+function withDate(time: Date, date: Date) {
+  const d = new Date(time);
+  d.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+  return d;
+}
+function fmtDate(d: Date) {
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
   title: {
     fontSize: 24,
     fontWeight: "700",
     color: TEXT_PRIMARY,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  group: { gap: 12 },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+
+  label: {
+    fontSize: 14,
+    color: TEXT_SECONDARY,
+    fontWeight: "700",
+    marginBottom: 6,
+    marginTop: 10,
+  },
   input: {
     backgroundColor: "#FFFFFF",
     borderColor: BORDER,
@@ -413,23 +466,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
     color: TEXT_PRIMARY,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
-  },
-  textarea: {
-    minHeight: 120,
-    textAlignVertical: "top",
-    lineHeight: 20,
-  },
-  labelRow: { marginTop: 6 },
-  label: {
-    fontSize: 14,
-    color: TEXT_SECONDARY,
-    fontWeight: "600",
-    marginBottom: 6,
   },
   inputPressable: {
     backgroundColor: "#FFFFFF",
@@ -438,17 +474,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
   },
   inputText: { fontSize: 16, color: TEXT_PRIMARY },
-  timeRow: { flexDirection: "row", alignItems: "flex-start" },
-  hint: { fontSize: 12, color: "#6B7280", marginTop: 6 },
-  error: { fontSize: 12, color: "#DC2626", marginTop: 6 },
-  createBtn: {
+
+  timeRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 10 },
+
+  textarea: { minHeight: 110, textAlignVertical: "top", marginTop: 6 },
+
+  hint: { fontSize: 12, color: "#DC2626", marginTop: 8 },
+
+  saveBtn: {
     position: "absolute",
     left: 20,
     right: 20,
@@ -464,12 +499,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
   },
-  createText: {
+  saveText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(15,23,42,0.25)",

@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "utils/supabase";
 
 type AreaKey =
@@ -124,7 +125,12 @@ export default function HomePage() {
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => router.push(`/${item.id}`)}
+        onPress={() =>
+          router.push({
+            pathname: "[id]",
+            params: { id: String(item.id) },
+          })
+        }
         style={styles.row}
       >
         <Image source={{ uri: item.image }} style={styles.logo} />
@@ -164,18 +170,11 @@ export default function HomePage() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Volunteer Verse</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => router.push("/settings")}
-          >
-            <Text style={styles.iconText}>⚙️</Text>
-          </TouchableOpacity>
-
-          {/* NEW: Calendar Button */}
+          {/* Calendar Button */}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push("/calendar")}
@@ -183,6 +182,21 @@ export default function HomePage() {
             <Text style={styles.iconText}>📅</Text>
           </TouchableOpacity>
 
+          {/* Profile Button */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() =>
+              router.push({
+                pathname: "/profile",
+                params: { type: "volunteer" },
+              })
+            }
+            activeOpacity={0.8}
+          >
+            <Text style={styles.iconText}>👤</Text>
+          </TouchableOpacity>
+
+          {/* Likes Filter */}
           <TouchableOpacity
             style={[styles.iconBtn, showLikedOnly && { borderColor: HEART }]}
             onPress={() => setShowLikedOnly((v) => !v)}
@@ -194,6 +208,7 @@ export default function HomePage() {
           </TouchableOpacity>
         </View>
       </View>
+
       <View style={styles.searchContainer}>
         <TextInput
           value={search}
@@ -214,7 +229,7 @@ export default function HomePage() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -301,13 +316,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   header: {
     paddingHorizontal: 20,
-    marginTop: "10%",
-    paddingTop: 20,
     paddingBottom: 12,
+    backgroundColor: BG,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: BG,
   },
   headerTitle: { fontSize: 22, fontWeight: "800", color: TEXT_PRIMARY },
   headerActions: { flexDirection: "row", gap: 8 },

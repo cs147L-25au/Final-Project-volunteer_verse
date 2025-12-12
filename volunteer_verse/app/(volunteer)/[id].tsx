@@ -9,7 +9,7 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { supabase } from "utils/supabase";
 
 type AreaKey =
@@ -62,7 +62,6 @@ export default function OrgDetails() {
     }
     (async () => {
       try {
-        // Fetch organization
         const { data: orgRow, error: orgErr } = await supabase
           .from("Org_info")
           .select(
@@ -78,7 +77,6 @@ export default function OrgDetails() {
           }
           return;
         }
-
         const areas: AreaKey[] = [];
         if (orgRow.Environment) areas.push("environment");
         if (orgRow.Education) areas.push("education");
@@ -86,7 +84,6 @@ export default function OrgDetails() {
         if (orgRow.Animals) areas.push("animals");
         if (orgRow.Outreach) areas.push("community");
         if (orgRow.Marginalized_group) areas.push("marginalized");
-
         const mappedOrg: Org = {
           id: String(orgRow.id),
           name: orgRow.org_name ?? "Unnamed",
@@ -102,13 +99,11 @@ export default function OrgDetails() {
         };
         if (active) setOrg(mappedOrg);
 
-        // Fetch events for this org
         const { data: evRows, error: evErr } = await supabase
           .from("events")
           .select("id,name,description,location,start_at,end_at")
           .eq("org_id", numericId)
           .order("start_at", { ascending: true });
-
         if (evErr) throw evErr;
 
         const mappedEvents: EventItem[] = (evRows ?? []).map((row: any) => ({
@@ -119,7 +114,6 @@ export default function OrgDetails() {
           startISO: row.start_at,
           endISO: row.end_at,
         }));
-
         if (active) setEvents(mappedEvents);
       } catch (e: any) {
         Alert.alert("Error", e.message ?? "Failed to load organization");
@@ -160,6 +154,15 @@ export default function OrgDetails() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerTransparent: true,
+          headerTitle: "",
+          headerTintColor: TEXT_PRIMARY,
+          headerShadowVisible: false,
+          headerBackTitle: "Back",
+        }}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>{org.name}</Text>
         <Image source={{ uri: org.image }} style={styles.hero} />
@@ -233,7 +236,8 @@ function InfoItem({
 
 function EventCard({ event }: { event: EventItem }) {
   const [expanded, setExpanded] = useState(false);
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // slot keys: startISO
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const start = new Date(event.startISO);
   const end = new Date(event.endISO);
@@ -257,6 +261,11 @@ function EventCard({ event }: { event: EventItem }) {
     () => buildSlots(start, end),
     [event.startISO, event.endISO]
   );
+  const slotMap = useMemo(() => {
+    const m = new Map<string, { start: Date; end: Date }>();
+    slots.forEach((s) => m.set(s.start.toISOString(), s));
+    return m;
+  }, [slots]);
 
   const toggleSlot = (key: string) => {
     setSelectedSlots((prev) =>
@@ -264,17 +273,55 @@ function EventCard({ event }: { event: EventItem }) {
     );
   };
 
-  const handleRegister = () => {
-    if (selectedSlots.length === 0) return;
-    const dayLabel = new Date(event.startISO).toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-    });
-    Alert.alert(
-      "Registration",
-      `You have requested to volunteer at ${event.name} on ${dayLabel}`
-    );
+  const handleRegister = async () => {
+    if (selectedSlots.length === 0 || saving) return;
+    try {
+      setSaving(true);
+      const { data: auth, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !auth.user) throw authErr || new Error("Not signed in");
+      const userId = auth.user.id;
+
+      // Clean existing registrations for these slots (if any), then insert
+      const { error: delErr } = await supabase
+        .from("event_registrations")
+        .delete()
+        .eq("event_id", event.id)
+        .eq("user_id", userId)
+        .in("slot_start", selectedSlots);
+      if (delErr && delErr.code !== "PGRST116") {
+        // PGRST116 = no rows found; ignore
+        throw delErr;
+      }
+
+      const rows = selectedSlots.map((key) => {
+        const s = slotMap.get(key)!;
+        return {
+          event_id: event.id,
+          user_id: userId,
+          slot_start: s.start.toISOString(),
+          slot_end: s.end.toISOString(),
+        };
+      });
+
+      const { error: insErr } = await supabase
+        .from("event_registrations")
+        .insert(rows);
+      if (insErr) throw insErr;
+
+      const dayLabel = new Date(event.startISO).toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      });
+      Alert.alert(
+        "Registration",
+        `You have requested to volunteer at ${event.name} on ${dayLabel}`
+      );
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Failed to register");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -296,7 +343,6 @@ function EventCard({ event }: { event: EventItem }) {
       {expanded && (
         <View style={styles.eventBody}>
           <Text style={styles.eventDesc}>{event.description}</Text>
-
           <Text style={styles.slotsLabel}>Available time slots</Text>
           <View style={styles.slotsWrap}>
             {slots.map((s) => {
@@ -332,9 +378,11 @@ function EventCard({ event }: { event: EventItem }) {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleRegister}
-              style={styles.registerBtn}
+              style={[styles.registerBtn, saving && { opacity: 0.7 }]}
             >
-              <Text style={styles.registerText}>Register</Text>
+              <Text style={styles.registerText}>
+                {saving ? "Registering..." : "Register"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -345,7 +393,7 @@ function EventCard({ event }: { event: EventItem }) {
 
 function buildSlots(start: Date, end: Date) {
   const slots: { start: Date; end: Date }[] = [];
-  const stepMs = 30 * 60 * 1000; // 30 min
+  const stepMs = 30 * 60 * 1000;
   let cur = new Date(start);
   while (cur < end) {
     const next = new Date(cur.getTime() + stepMs);
@@ -365,7 +413,7 @@ function fmtTime(d: Date) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+  scrollContent: { padding: "3%", paddingTop: "25%" },
   title: {
     fontSize: 24,
     fontWeight: "800",
@@ -377,7 +425,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 16,
     backgroundColor: "#FFF",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   section: { marginTop: 8 },
   sectionLabel: {

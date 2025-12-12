@@ -1,5 +1,5 @@
-// First page of organization signup flow.
-// User enters organization details and then continues to accountinfo
+// STEP 3 (Organization): Org Details
+// Navigates to: Org Dashboard (/orgdashboard)
 import React, { useState } from "react";
 import {
   View,
@@ -11,7 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { supabase } from "../../../utils/supabase";
+import { supabase } from "@/utils/supabase";
 
 const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
@@ -40,11 +40,21 @@ export default function NewOrganization() {
     };
 
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      const userId = userData.user?.id;
+      // Require an active session (avoids AuthSessionMissingError)
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const userId = sessionData.session?.user?.id;
       if (!userId) {
-        throw new Error("No authenticated user found. Please log in again.");
+        Alert.alert(
+          "Please log in",
+          "We need you to be signed in before saving your organization. After logging in, we'll bring you back here."
+        );
+        router.replace({
+          pathname: "/(user-flow)",
+          params: { next: "neworganization" },
+        });
+        return;
       }
 
       // Ensure the user_info_ table marks this account as an organization
@@ -106,7 +116,11 @@ export default function NewOrganization() {
         }
       }
 
-      router.push("/accountinfo");
+      Alert.alert(
+        "Organization saved",
+        "Your organization info has been saved. Opening dashboard..."
+      );
+      router.replace("/orgdashboard");
     } catch (err) {
       console.error("Failed to save organization info", err);
       Alert.alert(
@@ -119,11 +133,7 @@ export default function NewOrganization() {
   };
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/signup");
-    }
+    router.back();
   };
 
   return (
@@ -206,7 +216,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
-    paddingTop: 20
+    paddingTop: 20,
   },
   backText: {
     color: ACCENT,

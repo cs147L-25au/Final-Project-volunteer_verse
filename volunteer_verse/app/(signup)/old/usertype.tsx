@@ -1,5 +1,4 @@
-// FIRST PAGE OF SIGN UP, user selects whether they
-// are a volunteer or organization
+// STEP 1: Select Role (Volunteer/Org)
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
@@ -12,7 +11,15 @@ export default function Usertype() {
 
   const handleNext = () => {
     if (!role) return;
-    router.push(role === "volunteer" ? "/newvolunteer" : "/neworganization");
+    if (role === "volunteer") {
+      router.push("/newvolunteer");
+    } else {
+      // Org signups: create account first, then continue to org details
+      router.push({
+        pathname: "/accountinfo",
+        params: { role: "organization", next: "neworganization" },
+      });
+    }
   };
 
   const goBack = () => {
@@ -90,7 +97,7 @@ function RadioOption({
   );
 }
 
-const ACCENT = "#5865F2"; // pleasant indigo
+const ACCENT = "#5865F2";
 const BG = "#F5F7FB";
 const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
@@ -127,12 +134,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12,
-    // shadow for iOS
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    // elevation for Android
     elevation: 3,
   },
   option: {
