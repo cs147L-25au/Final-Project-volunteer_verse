@@ -8,6 +8,7 @@ import {
   TextInput,
   Image,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -20,6 +21,8 @@ const TEXT_PRIMARY = "#1F2937";
 const TEXT_SECONDARY = "#4B5563";
 const BORDER = "#E5E7EB";
 const DANGER = "#EF4444";
+const API_KEY = "31527b89b5c5fa4b67a22629fabe2e1a";
+
 
 type AreaKey =
   | "environment"
@@ -105,6 +108,7 @@ function extFromUriOrMime(uri: string, mime?: string) {
 export default function ProfilePage() {
   const router = useRouter();
   const headerHeight = useHeaderHeight();
+  const topPadding = Math.max(16, headerHeight * 0.25);
   const { type } = useLocalSearchParams<{ type?: string }>();
   const isOrg = type === "org";
 
@@ -126,6 +130,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [weather, setWeather] = useState<any | null>(null);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const profileLocation = (isOrg ? location : vLocation)?.trim() ?? "";
 
   const getUserId = useCallback(async () => {
     const { data, error } = await supabase.auth.getSession();
@@ -263,6 +271,41 @@ export default function ProfilePage() {
     };
   }, [isOrg, getUserId]);
 
+  useEffect(() => {
+    if (!profileLocation) {
+      setWeather(null);
+      setWeatherError(null);
+      return;
+    }
+    let active = true;
+    const fetchWeather = async () => {
+      try {
+        setWeatherLoading(true);
+        const res = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
+            profileLocation
+          )}&appid=${API_KEY}&units=imperial`
+        );
+        const data = await res.json();
+        if (data.cod !== 200) throw new Error(data.message);
+        if (active) {
+          setWeather(data);
+          setWeatherError(null);
+        }
+      } catch (err: any) {
+        if (!active) return;
+        setWeather(null);
+        setWeatherError(err.message ?? "Unable to load weather");
+      } finally {
+        if (active) setWeatherLoading(false);
+      }
+    };
+    fetchWeather();
+    return () => {
+      active = false;
+    };
+  }, [profileLocation]);
+
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
@@ -381,7 +424,7 @@ export default function ProfilePage() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: "10%" }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.avatarRow}>
@@ -413,6 +456,56 @@ export default function ProfilePage() {
               </Text>
             </View>
           </TouchableOpacity>
+        </View>
+        <View style={styles.weatherWrapper}>
+          {!profileLocation ? (
+            <View style={[styles.weatherCard, styles.weatherErrorCard]}>
+              <Text style={styles.weatherErrorText}>
+                Add your city or region to see the current weather.
+              </Text>
+            </View>
+          ) : weatherLoading ? (
+            <View style={styles.weatherCard}>
+              <ActivityIndicator color={ACCENT} />
+              <Text style={styles.weatherLoadingText}>Fetching weather...</Text>
+            </View>
+          ) : weather ? (
+            <View style={styles.weatherCard}>
+              <View>
+                <Text style={styles.weatherCity}>
+                  {weather?.name || profileLocation}
+                </Text>
+                <Text style={styles.weatherDescription}>
+                  {weather?.weather?.[0]?.description
+                    ? weather.weather[0].description.replace(
+                        /\b\w/g,
+                        (c: string) => c.toUpperCase()
+                      )
+                    : "Current conditions"}
+                </Text>
+                {typeof weather?.main?.temp === "number" && (
+                  <Text style={styles.weatherTemp}>
+                    {Math.round(weather.main.temp)}
+                    <Text style={styles.weatherUnit}>{`\u00B0F`}</Text>
+                  </Text>
+                )}
+              </View>
+              {weather?.weather?.[0]?.icon && (
+                <Image
+                  source={{
+                    uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
+                  }}
+                  style={styles.weatherIcon}
+                />
+              )}
+            </View>
+          ) : (
+            <View style={[styles.weatherCard, styles.weatherErrorCard]}>
+              <Text style={styles.weatherErrorText}>
+                {weatherError || "Unable to show the weather right now."}
+              </Text>
+            </View>
+          )}
         </View>
         {isOrg ? (
           <View style={styles.formSection}>
@@ -614,6 +707,29 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   chipLabel: { fontSize: 14, color: TEXT_SECONDARY, fontWeight: "500" },
+  weatherWrapper: { marginBottom: 16 },
+  weatherCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  weatherCity: { fontSize: 16, color: TEXT_PRIMARY, fontWeight: "700" },
+  weatherDescription: { fontSize: 14, color: TEXT_SECONDARY, marginTop: 2 },
+  weatherTemp: { fontSize: 32, fontWeight: "700", color: TEXT_PRIMARY, marginTop: 8 },
+  weatherUnit: { fontSize: 16, fontWeight: "600", color: TEXT_SECONDARY },
+  weatherIcon: { width: 72, height: 72, marginLeft: 12 },
+  weatherLoadingText: { color: TEXT_SECONDARY, fontSize: 14 },
+  weatherErrorCard: {
+    backgroundColor: rgba("#94A3B8", 0.15),
+    borderColor: "transparent",
+  },
+  weatherErrorText: { color: TEXT_SECONDARY, fontSize: 14, lineHeight: 20 },
   saveBtn: {
     backgroundColor: ACCENT,
     borderRadius: 14,
