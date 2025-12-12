@@ -413,7 +413,7 @@ function fmtTime(d: Date) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { padding: "3%" },
+  scrollContent: { padding: "3%", paddingTop: "25%" },
   title: {
     fontSize: 24,
     fontWeight: "800",
