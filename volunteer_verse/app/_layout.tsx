@@ -68,21 +68,6 @@ export default function RootLayout() {
             Platform.OS === "ios" ? "systemMaterial" : undefined,
         }}
       />
-
-      {/* Details stack */}
-      <Stack.Screen
-        name="details"
-        options={{
-          headerShown: true,
-          headerTitle: "",
-          headerTransparent: true,
-          headerTintColor: "#1F2937",
-          headerShadowVisible: false,
-          headerBlurEffect:
-            Platform.OS === "ios" ? "systemMaterial" : undefined,
-        }}
-      />
-
       {/* Edit event stack */}
       <Stack.Screen
         name="editevent"

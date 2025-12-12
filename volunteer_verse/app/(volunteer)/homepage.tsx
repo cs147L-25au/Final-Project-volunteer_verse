@@ -127,7 +127,7 @@ export default function HomePage() {
         activeOpacity={0.9}
         onPress={() =>
           router.push({
-            pathname: "/details/[id]",
+            pathname: "[id]",
             params: { id: String(item.id) },
           })
         }

@@ -16,6 +16,10 @@ export default function VolunteerLayout() {
         name="calendar"
         options={{ headerShown: true, headerTitle: "Calendar" }}
       />
+      <Stack.Screen
+        name="[id]"
+        options={{ headerShown: true, headerTitle: "Details" }}
+      />
     </Stack>
   );
 }
