@@ -381,10 +381,7 @@ export default function ProfilePage() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: headerHeight },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: "10%" }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.avatarRow}>
